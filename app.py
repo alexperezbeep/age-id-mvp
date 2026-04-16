@@ -30,7 +30,7 @@ with st.sidebar:
     selected_class = st.selectbox("Select Class (Nudge AI)", class_options)
     feature = st.text_input("Distinguishing Feature", placeholder="e.g. 4-pin connector / PN 2335")
 
-    # REFRESH TRIGGER
+    # --- THE REFRESH TRIGGER ---
     current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}-{selected_class}"
     if st.session_state.fingerprint != current_fp:
         st.session_state.resolved_results = [] 
@@ -58,31 +58,39 @@ with col1:
             time.sleep(1.2)
             f_low = feature.lower()
             
-            # Simulated Logic with Multiple Matches for Backlog Testing
-            if "switch" in f_low or "2335" in f_low:
+            # --- CONCRETE RESOLUTION LOGIC ---
+            
+            # CASE A: POWER GEN EQUIPMENT (EB 0402)
+            if "eb 0402" in f_low or (selected_class == "Power Gen" and mode == "Equipment"):
                 st.session_state.resolved_results = [
-                    {"nsn": "5930-01-235-1271", "pn": "2335-127-11", "name": "Switch, Press", "conf": 98, "status": "GREEN", "to": "1-1520-237-23", "action": "Ready to Order"},
-                    {"nsn": "5930-01-135-0096", "pn": "2335-4", "name": "Switch, Alt", "conf": 72, "status": "YELLOW", "to": "1-1520-237-4", "action": "Verify PSI"},
-                    {"nsn": "5930-01-000-1111", "pn": "ALT-2335", "name": "Switch, Sub", "conf": 65, "status": "YELLOW", "to": "N/A", "action": "Check Fit"},
-                    {"nsn": "5930-01-999-9999", "pn": "LEGACY-X", "name": "Obsolete", "conf": 45, "status": "RED", "to": "N/A", "action": "Halt Order"}
+                    {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Generator Set, Diesel", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order"},
+                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Generator Set, Electric", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output"},
+                    {"nsn": "6115-01-123-4567", "pn": "B809-GEN", "name": "Legacy Power Unit", "conf": 40, "status": "YELLOW", "to": "N/A", "action": "Check Fit"},
+                    {"nsn": "6115-00-000-0000", "pn": "OBSOLETE", "name": "Static Inverter", "conf": 10, "status": "RED", "to": "N/A", "action": "Wrong Asset"}
                 ]
-            elif "moog" in f_low or ("4-pin" in f_low and selected_class == "Hydraulic"):
+            
+            # CASE B: HYDRAULIC PARTS (MOOG SERVO)
+            elif "moog" in f_low or (selected_class == "Hydraulic" and "valve" in f_low):
                 st.session_state.resolved_results = [
-                    {"nsn": "4820-01-512-1001", "pn": "G761-3000P", "name": "Valve, Servo", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order"},
-                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Flow", "conf": 82, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow"},
-                    {"nsn": "4820-01-111-3333", "pn": "MOOG-GEN", "name": "Gen Valve", "conf": 70, "status": "YELLOW", "to": "N/A", "action": "Check Dim"},
-                    {"nsn": "4820-01-888-0000", "pn": "PNEU-V", "name": "Pneumatic", "conf": 15, "status": "RED", "to": "N/A", "action": "Wrong System"}
+                    {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Valve, Servo, Hydraulic", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order"},
+                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow"},
+                    {"nsn": "4820-01-999-8888", "pn": "MOOG-LEGACY", "name": "Actuator Valve", "conf": 50, "status": "YELLOW", "to": "N/A", "action": "Check PSI"},
+                    {"nsn": "4820-00-111-2222", "pn": "PNEU-V", "name": "Pneumatic Alternative", "conf": 15, "status": "RED", "to": "N/A", "action": "Incompatible"}
                 ]
+            
+            # CASE C: BASELINE / UNIDENTIFIED
             else:
-                st.session_state.resolved_results = [{"nsn": "Multiple", "pn": "VARIOUS", "name": "Search", "conf": 60, "status": "YELLOW", "to": "IPB", "action": "Manual"}]
+                st.session_state.resolved_results = [
+                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "System Match", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual"}
+                ]
         st.rerun()
 
 with col2:
     st.header("2. NSN Resolution & Validation")
     if not st.session_state.resolved_results:
-        st.info("Input change detected. Stage for Request to see fresh logs.")
+        st.info("Awaiting input. Select Mode/Class and Stage for Request.")
     else:
-        # SORT AND SPLIT LOGIC
+        # SORT AND SPLIT FOR TOP 3 + BACKLOG
         res = sorted(st.session_state.resolved_results, key=lambda x: x['conf'], reverse=True)
         top_3 = res[:3]
         backlog = res[3:]
@@ -104,7 +112,7 @@ with col2:
                             st.session_state.cart[item['nsn']] = {"pn": item['pn'], "qty": qty}
                             st.rerun()
 
-        # BACKLOG DROPDOWN
+        # BACKLOG SECTION
         if backlog:
             st.divider()
             with st.expander(f"View Additional Potential Matches (Backlog: {len(backlog)})"):
