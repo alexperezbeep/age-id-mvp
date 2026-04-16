@@ -1,42 +1,40 @@
 import streamlit as st
 import time
 
-# --- Page Config ---
+# --- INITIALIZATION ---
+# This ensures your results don't reset when you click "Add to Cart"
+if 'resolved_nsns' not in st.session_state:
+    st.session_state.resolved_nsns = []
+if 'cart' not in st.session_state:
+    st.session_state.cart = {}
+
 st.set_page_config(page_title="Falcon Dashboard", layout="wide")
 
-# --- Custom CSS for the "Warzone" Dark Theme ---
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: white; }
-    .stButton>button { width: 100%; border-radius: 5px; }
+    .stApp { background-color: #0E1117; }
     .nsn-card {
-        border: 1px solid #262730;
-        padding: 15px;
+        background-color: #161B22;
+        border: 1px solid #30363D;
+        padding: 20px;
         border-radius: 10px;
-        background-color: #161b22;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
     }
-    .conf-green { color: #2ea043; font-weight: bold; font-size: 1.2rem; }
+    .confidence { color: #2EA043; font-weight: bold; font-size: 1.5rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- Session State Initialization ---
-if 'nsn_results' not in st.session_state:
-    st.session_state.nsn_results = []
-if 'cart' not in st.session_state:
-    st.session_state.cart = []
-
-# --- Sidebar Taxonomy & Inputs ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("Falcon Dashboard")
-    
-    uploaded_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
+    uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
     
     st.write("### Taxonomy Selection")
-    mode = st.radio("Type", ["Equipment", "Part"], index=1, label_visibility="collapsed")
+    taxonomy = st.radio("Type", ["Equipment", "Part"], index=1, label_visibility="collapsed")
     
     st.write("### Select Part Class")
-    part_class = st.selectbox("Class", ["Hydraulic", "Electrical", "Structural", "Avionics"], label_visibility="collapsed")
+    p_class = st.selectbox("Class", ["Hydraulic", "Electrical", "Structural"], label_visibility="collapsed")
     
     st.write("### Distinguishing Feature (Optional)")
     feature = st.text_input("Feature", value="hydraylic punpk", label_visibility="collapsed")
@@ -44,64 +42,61 @@ with st.sidebar:
     st.divider()
     st.write("### 🛒 Supply Cart")
     if not st.session_state.cart:
-        st.caption("No items added.")
+        st.caption("No items in cart.")
     else:
-        for item in st.session_state.cart:
-            st.write(f"- {item}")
+        for nsn, qty in st.session_state.cart.items():
+            st.write(f"**{nsn}** (Qty: {qty})")
 
-# --- Main Logic ---
+# --- MAIN INTERFACE ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
     st.header("1. Digital Inspection")
-    
-    # Display Uploaded Image or Placeholder
     if uploaded_file:
         st.image(uploaded_file, use_column_width=True)
-    else:
-        st.info("Please upload an image to begin inspection.")
-
-    # Execute Button
-    if st.button("🚀 EXECUTE LOGISTICS LOCK", type="primary"):
-        with st.spinner("Analyzing Logistics Data..."):
-            # Simulation of API/Model Logic
-            time.sleep(1.5) 
+    
+    # THE TRIGGER: This breaks the "Full Block"
+    if st.button("🚀 EXECUTE LOGISTICS LOCK", type="primary", use_container_width=True):
+        with st.spinner("Analyzing maintenance data..."):
+            time.sleep(1.2) # Simulate model latency
             
-            # Logic: If 'pump' is detected (even with your typo), return these NSNs
+            # CALCULATION LOGIC: 
+            # In a real app, this calls your AGE-ID-MVP model.
+            # Here, we update the state so the right column reacts.
             if "pump" in feature.lower() or "punpk" in feature.lower():
-                st.session_state.nsn_results = [
-                    {"nsn": "4520-01-135-2770", "name": "Hydraulic (H-1)", "conf": "96%"},
-                    {"nsn": "4520-01-482-8571", "name": "Hydraulic (NGH-1)", "conf": "82%"},
-                    {"nsn": "4520-00-540-1444", "name": "Hydraulic (BT400)", "conf": "62%"}
+                st.session_state.resolved_nsns = [
+                    {"nsn": "4520-01-135-2770", "label": "Hydraulic (H-1)", "conf": "96%"},
+                    {"nsn": "4520-01-482-8571", "label": "Hydraulic (NGH-1)", "conf": "82%"},
+                    {"nsn": "4520-00-540-1444", "label": "Hydraulic (BT400)", "conf": "62%"}
                 ]
             else:
-                st.session_state.nsn_results = [
-                    {"nsn": "0000-00-000-0000", "name": "Unknown Component", "conf": "0%"}
-                ]
+                st.session_state.resolved_nsns = [{"nsn": "Unknown", "label": "Manual Lookup Req", "conf": "N/A"}]
         st.rerun()
 
 with col2:
     st.header("2. NSN Resolution")
     
-    if st.session_state.nsn_results:
-        for res in st.session_state.nsn_results:
-            # Render individual cards dynamically
+    # If state is empty, show the "Static" message or instructions
+    if not st.session_state.resolved_nsns:
+        st.info("Upload AGE part image and execute logistics lock to resolve NSN.")
+    else:
+        # DYNAMIC RENDERING: Loops through the results in session state
+        for item in st.session_state.resolved_nsns:
             with st.container():
                 st.markdown(f"""
                 <div class="nsn-card">
-                    <div style="display: flex; justify-content: space-between;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
                         <div>
-                            <span style="color: #8b949e;">NSN:</span> <strong>{res['nsn']}</strong><br>
-                            <span style="font-size: 0.9rem;">{res['name']}</span><br>
-                            <span style="font-size: 0.8rem; color: #8b949e;">Logistics Match Confirmed via Visual Anchors.</span>
+                            <div style="color: #8B949E; font-size: 0.8rem;">NSN: {item['nsn']}</div>
+                            <div style="font-weight: bold; font-size: 1.1rem;">{item['label']}</div>
+                            <div style="color: #8B949E; font-size: 0.75rem;">Logistics Match Confirmed via Visual Anchors.</div>
                         </div>
-                        <div class="conf-green">{res['conf']}</div>
+                        <div class="confidence">{item['conf']}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"Add to Supply Cart", key=res['nsn']):
-                    st.session_state.cart.append(f"{res['name']} ({res['nsn']})")
-                    st.toast(f"Added {res['nsn']} to cart!")
-    else:
-        st.info("Awaiting logistics execution...")
+                # Dynamic Button Logic for the Cart
+                if st.button(f"Add to Supply Cart", key=f"btn_{item['nsn']}"):
+                    st.session_state.cart[item['nsn']] = st.session_state.cart.get(item['nsn'], 0) + 1
+                    st.toast(f"NSN {item['nsn']} added to workflow.")
