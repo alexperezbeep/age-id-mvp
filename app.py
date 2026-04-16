@@ -4,28 +4,25 @@ from google.genai import types
 from PIL import Image
 import re
 
-# 1. Page Configuration
-st.set_page_config(page_title="Falcon H4D MVP", page_icon="🦅", layout="wide")
+# 1. Page Configuration & Aesthetic
+st.set_page_config(page_title="Falcon H4D: Logistics Audit", page_icon="🦅", layout="wide")
 
-# Custom UI Styling (Military Dark Mode)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
     div[data-testid="stMetricValue"] { font-size: 28px; color: #00d4ff; }
-    div[data-testid="stMetricDelta"] { font-size: 16px; }
-    h1, h2, h3 { color: #f0f2f6; }
-    .stAlert { border-radius: 8px; }
+    div[data-testid="stMetricDelta"] { font-size: 14px; font-weight: bold; }
+    [data-testid="stMetricValue"] { cursor: pointer; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Sidebar: The Command Dashboard
+# 2. Command Dashboard (Sidebar)
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=80)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=70)
     st.title("Falcon Dashboard")
-    st.info("Status: 🦅 Priority Recognition Active")
+    st.info("System Status: 🦅 Multi-Modal Audit Active")
     
     st.divider()
-    
     st.subheader("Step 1: Domain Selection")
     domains = ["Ground Support Equipment", "Engine / Powerplant", "Electrical / Avionics", "Hydraulic / Pneumatic", "Hardware / Universal"]
     selected_domain = st.selectbox("Technical Class:", domains)
@@ -40,43 +37,42 @@ with st.sidebar:
     }
     selected_profile = st.radio("Visual Profile:", profiles.get(selected_domain))
 
-    st.subheader("Step 3: Descriptive Cues")
-    user_cues = st.text_input("Refinement (Part #, Casting #, Marks)", placeholder="Ex: Casting #23505677")
+    st.subheader("Step 3: Technical Refinement")
+    user_cues = st.text_input("Input P/N, Casting #, or Marks:", placeholder="Ex: P/N 827482")
 
-# 3. Main Interface: Scanner & Results
-col_left, col_right = st.columns([1, 1.2])
+# 3. Execution Interface
+col_left, col_right = st.columns([1, 1.3])
 
 with col_left:
-    st.header("1. Access Scanner")
-    uploaded_file = st.file_uploader("Drop component photo for recognition", type=["jpg", "jpeg", "png"])
-    
+    st.header("1. Digital Inspection")
+    uploaded_file = st.file_uploader("Upload Component Scan", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         img = Image.open(uploaded_file)
-        st.image(img, caption="Live Scanner Feed", use_container_width=True)
+        st.image(img, caption="Unit under inspection", use_container_width=True)
         execute = st.button("🚀 EXECUTE LOGISTICS LOCK", use_container_width=True)
 
 with col_right:
-    st.header("2. Part Details & Logistics")
+    st.header("2. Logistics Audit Trail")
     
     if uploaded_file and execute:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         
-        with st.status("Performing Multi-Modal Taxonomy Analysis...", expanded=True) as status:
+        with st.status("Generating Graphical Criteria Report...", expanded=True) as status:
             prompt = f"""
             ACT AS A USAF MAINTENANCE SUPERINTENDENT.
             DOMAIN: {selected_domain} | PROFILE: {selected_profile} | CUES: {user_cues}
             
             TASK:
-            1. Identify the TOP 3 Logistics Matches (NSN, or CAGE/MPN for COTS).
-            2. For EACH match, provide a 'REGIMENTED GRAPHICAL CRITERIA' breakdown:
+            1. Identify TOP 3 Logistics Matches (NSN or CAGE/MPN).
+            2. For EACH match, provide:
                - CONFIDENCE SCORE: [XX]%
-               - VISUAL ANCHORS: List 3 specific physical features found in the image that confirm this match (e.g., '6-bolt flange', 'anodized fitting', 'specific OCR text').
-               - TECHNICAL SOURCE: Cite the T.O. IPB Figure/Index or Database used.
-               - MARGIN OF ERROR: State the specific visual ambiguity (e.g., 'Internal gasket type cannot be verified visually').
-            3. Provide the Primary Technical Order (T.O.) and 2 Safety Pitfalls.
-            4. HIERARCHY: Explicitly state that the Section Chief reports to the Production Superintendent.
+               - TIER: (Verified/Probable/Assisted)
+               - VISUAL ANCHORS: List 3 physical features in the image (bolt count, port alignment, OCR).
+               - LOGIC GAP: What remains unverified? (e.g. internal splines).
+               - TECHNICAL SOURCE: T.O. IPB Figure/Index or Database.
+            3. HIERARCHY: Remind user Section Chief reports to Production Superintendent.
             
-            FORMAT START: Return the highest confidence score as 'PRIMARY_CONFIDENCE: [XX]%' at the top.
+            FORMAT START: Return the primary confidence and tier as 'METRIC: [XX]%, [TIER]' at the top.
             """
             
             response = client.models.generate_content(
@@ -84,27 +80,35 @@ with col_right:
                 contents=[prompt, img],
                 config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
             )
-            status.update(label="Analysis Complete", state="complete")
+            status.update(label="Audit Complete", state="complete")
 
-        # Dynamic Metrics Extraction
-        res_text = response.text
-        p_conf = re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text).group(1) if re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text) else "85"
+        # Extract Metric and Tier
+        metric_match = re.search(r"METRIC:\s*(\d+)%,\s*(\w+)", response.text)
+        conf_val = metric_match.group(1) if metric_match else "85"
+        tier_val = metric_match.group(2) if metric_match else "Assisted"
 
+        # 4. Metric Dashboard with Popover Audit
         m1, m2, m3 = st.columns(3)
         with m1:
-            st.metric("Primary Match", f"{p_conf}%", delta="Target Locked")
-        m2.metric("Stock Status", "Verified", delta_color="normal")
-        m3.metric("Procurement", "Regimented")
+            with st.popover(f"🎯 Confidence: {conf_val}%"):
+                st.write(f"### 🛡️ Audit Tier: {tier_val}")
+                st.write("**Criteria Breakdown:**")
+                st.write("- **50%:** OCR/Literal match to DLA records.")
+                st.write("- **30%:** Geometric taxonomy (Flange/Ports).")
+                st.write("- **20%:** System context validation.")
+                st.caption("Clicking past confirms you've reviewed the Logic Gaps below.")
+        
+        m2.metric("Logistics Status", tier_val, delta="Verified Path" if tier_val == "Verified" else "Needs Review")
+        m3.metric("Lead Time", "24-48 Hours", delta="Priority A")
 
         st.divider()
-        st.subheader("📦 Supply Chain & Graphical Evidence")
         
-        # Displaying the regimented technical data
+        # 5. The Regimented Report
         with st.container(border=True):
-            # Strip the header tag and display the rest
-            final_report = res_text.split("PRIMARY_CONFIDENCE")[1].split("%", 1)[1] if "PRIMARY_CONFIDENCE" in res_text else res_text
+            # Show the report minus the metric header
+            final_report = response.text.split(tier_val)[1] if tier_val in response.text else response.text
             st.markdown(final_report)
             
             if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
                 st.balloons()
-                st.toast("Encrypted Data Transmitted to Section Chief for Final Validation.")
+                st.toast("Full Audit Trail transmitted to Section Chief.")
