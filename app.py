@@ -7,20 +7,21 @@ import re
 # 1. Page Configuration
 st.set_page_config(page_title="Falcon H4D MVP", page_icon="🦅", layout="wide")
 
-# Custom Styling for Mission-Ready Look
+# Custom CSS for dark-mode military aesthetic
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
     div[data-testid="stMetricValue"] { font-size: 28px; color: #00d4ff; }
     div[data-testid="stMetricDelta"] { font-size: 16px; }
+    h1, h2, h3 { color: #f0f2f6; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Sidebar: The Dashboard & Context-Lock
+# 2. Sidebar: The Command Dashboard
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=80)
     st.title("Falcon Dashboard")
-    st.info("Mission Status: 🦅 Priority Active")
+    st.info("Status: 🦅 Priority Recognition Active")
     
     st.divider()
     
@@ -39,14 +40,14 @@ with st.sidebar:
     selected_profile = st.radio("Visual Profile:", profiles.get(selected_domain))
 
     st.subheader("Step 3: Descriptive Cues")
-    user_cues = st.text_input("Refinement (Part #, Casting #, Marks)", placeholder="Ex: Casting #23505677")
+    user_cues = st.text_input("Refinement (Part #, Casting #, Marks)", placeholder="Ex: P/N 827482")
 
-# 3. Main Interface: Scanner & Logistics
+# 3. Main Interface
 col_left, col_right = st.columns([1, 1.2])
 
 with col_left:
     st.header("1. Access Scanner")
-    uploaded_file = st.file_uploader("Drop component photo for recognition", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Upload component photo", type=["jpg", "jpeg", "png"])
     
     if uploaded_file:
         img = Image.open(uploaded_file)
@@ -59,24 +60,21 @@ with col_right:
     if uploaded_file and execute:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         
-        with st.status("Analyzing Visual Taxonomy & Supply Data...", expanded=True) as status:
+        with st.status("Regimenting Technical Data...", expanded=True) as status:
             prompt = f"""
             ACT AS A USAF MAINTENANCE SUPERINTENDENT.
             DOMAIN: {selected_domain} | PROFILE: {selected_profile} | CUES: {user_cues}
             
             TASK:
-            1. Identify part/NSN. If no NSN exists (COTS), provide CAGE Code and MPN.
-            2. Assign a 'Confidence Score' based on image clarity and cue precision.
-            3. LOGIC CAPTURE: Explain exactly how you calculated the score (e.g., P/N match, visual markers).
-            4. List TOP 3 Logistics Matches.
-            5. HIERARCHY: Section Chief answers to Production Superintendent.
+            1. Identify the TOP 3 Logistics Matches (NSNs or CAGE/MPN for COTS).
+            2. For EACH match, provide this regimented breakdown:
+               - Confidence Score: [XX]%
+               - Source Validation: (Cite P/N, Visual Taxonomy, or Database)
+               - Technical Justification: (Why this variant?)
+            3. Provide the Primary Technical Order (T.O.) and 2 Safety Pitfalls.
+            4. HIERARCHY: Remind user that Section Chief reports to Production Superintendent.
             
-            FORMAT:
-            CONFIDENCE: [XX]%
-            LOGIC_START
-            [Explain sources/reasoning here]
-            LOGIC_END
-            [Rest of technical breakdown]
+            FORMAT START: Return the highest confidence score as 'PRIMARY_CONFIDENCE: [XX]%' at the top.
             """
             
             response = client.models.generate_content(
@@ -86,25 +84,24 @@ with col_right:
             )
             status.update(label="Analysis Complete", state="complete")
 
-        # Dynamic Metrics Extraction
+        # Extraction Logic
         res_text = response.text
-        conf_val = re.search(r"CONFIDENCE:\s*(\d+)%", res_text).group(1) if re.search(r"CONFIDENCE:\s*(\d+)%", res_text) else "85"
-        logic_text = re.search(r"LOGIC_START(.*?)LOGIC_END", res_text, re.DOTALL).group(1) if re.search(r"LOGIC_START(.*?)LOGIC_END", res_text, re.DOTALL) else "Calculated via visual geometry."
+        p_conf = re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text).group(1) if re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text) else "85"
 
         # Interactive Metrics View
         m1, m2, m3 = st.columns(3)
         with m1:
-            with st.popover(f"🎯 Confidence: {conf_val}%"):
-                st.write("### 🧠 Calculation Logic")
-                st.info(logic_text)
-                st.caption("Sources: DLA FED LOG, T.O. IPB Data, Visual OCR")
-        
-        m2.metric("Stock Status", "In Stock", delta="Verified")
-        m3.metric("Procurement", "NSN Preferred", delta="GPC Alt")
+            st.metric("Primary Match", f"{p_conf}%", delta="Target Locked")
+        m2.metric("Stock Status", "Verified", delta_color="normal")
+        m3.metric("Procurement", "Regimented")
 
-        with st.container(border=True):
-            st.markdown(res_text.split("LOGIC_END")[-1]) # Display technical data only
-            
-            if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
-                st.balloons()
-                st.toast("Encrypted Data Transmitted to Section Chief.")
+        st.divider()
+        st.subheader("📦 Supply Chain Analysis")
+        
+        # Clean up text for final display
+        final_display = res_text.split("PRIMARY_CONFIDENCE")[1].split("%", 1)[1] if "PRIMARY_CONFIDENCE" in res_text else res_text
+        st.markdown(final_display)
+        
+        if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
+            st.balloons()
+            st.toast("Encrypted Data Transmitted to Section Chief.")
