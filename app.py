@@ -1,54 +1,52 @@
 import streamlit as st
 import time
 
-# --- 1. ENHANCED STATE INITIALIZATION ---
-# Forces cart to be a dict if it was previously a list from an old session
+# --- 1. STATE INITIALIZATION & REFRESH ---
 if 'cart' not in st.session_state or isinstance(st.session_state.cart, list):
     st.session_state.cart = {} 
-
 if 'resolved_results' not in st.session_state:
     st.session_state.resolved_results = []
-
 if 'fingerprint' not in st.session_state:
     st.session_state.fingerprint = None
 
 st.set_page_config(page_title="Falcon Dashboard | Mission Ready", layout="wide")
 
-# --- 2. SIDEBAR: AIR FORCE PROCESS FOCUS ---
+# --- 2. SIDEBAR: RESTORED TAXONOMY & CATEGORIES ---
 with st.sidebar:
     st.title("🦅 Falcon Dashboard")
-    st.caption("Integrated Decision Support | H4D Phase 3")
     uploaded_file = st.file_uploader("Upload Component Image", type=['png', 'jpg', 'jpeg'])
     
     st.divider()
-    mode = st.radio("Asset Taxonomy", ["Part/Component", "Equipment (AGE)"], index=0)
+    # RESTORED: The "IDK" safety net is back
+    mode = st.radio("Asset Mode", ["Equipment", "Part", "Unknown / Not Sure"], index=2)
     
-    # Hierarchy-based Class Selection
-    if mode == "Part/Component":
-        class_options = ["Electrical (5930)", "Hydraulic (4730)", "Mechanical (5340)"]
+    # RESTORED: Important categories for specific maintenance workflows
+    if mode == "Equipment":
+        class_options = ["Power Gen", "HVAC", "Hydraulic Stands", "Towing Gear"]
+    elif mode == "Part":
+        class_options = ["Hydraulic", "Electrical", "Structural", "Pneumatic"]
     else:
-        class_options = ["Power Gen (6115)", "HVAC (4120)"]
+        # The IDK step defaults to a broad scan
+        class_options = ["Auto-Detect Category (Broad Scan)"]
         
-    selected_class = st.selectbox("Federal Supply Class (FSC)", class_options)
-    feature = st.text_input("Distinguishing Feature / Stamped PN", placeholder="e.g. 2335-127-11")
+    selected_class = st.selectbox("Select Class", class_options)
+    feature = st.text_input("Distinguishing Feature", placeholder="e.g. Pressure Switch / PN 2335")
 
-    # REFRESH TRIGGER: Detects changes to wipe stale NSN logs
-    current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}"
+    # --- THE REFRESH TRIGGER ---
+    # Monitors everything to ensure the NSN log purges on ANY change
+    current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}-{selected_class}"
     if st.session_state.fingerprint != current_fp:
-        st.session_state.resolved_results = []
+        st.session_state.resolved_results = [] # PURGE stale NSNs
         st.session_state.fingerprint = current_fp
 
     # ACTIONABLE SUPPLY CART
     st.divider()
     st.write(f"### 🛒 Supply Request Stage ({len(st.session_state.cart)})")
-    
-    # The fix for your Traceback error happens here:
     for nsn, data in st.session_state.cart.items():
         st.caption(f"**{data['pn']}** | Qty: {data['qty']}")
     
-    if st.session_state.cart:
-        if st.button("📤 Generate TO Slip / Export to ILS-S", use_container_width=True):
-            st.success("Manifest Staged for Supply Sergeant Review")
+    if st.session_state.cart and st.button("📤 Export to ILS-S / FedLog"):
+        st.success("Manifest Staged for Logistics Review")
 
 # --- 3. MAIN INTERFACE ---
 col1, col2 = st.columns([1, 1.2])
@@ -59,56 +57,53 @@ with col1:
         st.image(uploaded_file, use_column_width=True)
     
     if st.button("📝 STAGE FOR SUPPLY REQUEST", type="primary", use_container_width=True):
-        with st.spinner("Querying FedLog & Technical Orders..."):
-            time.sleep(1.2)
+        with st.spinner("Locking Logistics..."):
+            time.sleep(1)
             f_low = feature.lower()
             
-            # Simulated backend matching for UH-60 components
-            if "2335" in f_low or "switch" in f_low:
+            # Smart Branching based on your Restored Taxonomy
+            if mode == "Unknown / Not Sure" and not feature:
+                # The "True IDK" Result
+                st.session_state.resolved_results = [{
+                    "nsn": "Unknown", "pn": "PENDING_VISUAL_ID", "name": "Unindexed component",
+                    "conf": 45, "status": "RED", "to": "N/A", 
+                    "notes": "Low confidence. Geometry suggests valve or spool.", "action": "Escalate to Level 7"
+                }]
+            elif "switch" in f_low or "2335" in f_low:
+                # The "Verified Part" Result
                 st.session_state.resolved_results = [
                     {
                         "nsn": "5930-01-235-1271", "pn": "2335-127-11", "name": "Switch, Pressure",
-                        "conf": 98, "status": "GREEN", "to": "1-1520-237-23", "fedlog": "Verified",
-                        "notes": "Standard Bleed Air Switch for UH-60 ECS.", "action": "Ready to Order"
-                    },
-                    {
-                        "nsn": "5930-01-135-0096", "pn": "2335-4", "name": "Switch, Pressure",
-                        "conf": 72, "status": "YELLOW", "to": "1-1520-237-4", "fedlog": "Verified",
-                        "notes": "Legacy variant. Verify PSI threshold in TO before staging.", "action": "Manual Verification Required"
+                        "conf": 98, "status": "GREEN", "to": "1-1520-237-23", 
+                        "notes": "Standard Bleed Air Switch.", "action": "Ready to Order"
                     }
                 ]
             else:
-                st.session_state.resolved_results = [
-                    {
-                        "nsn": "Unknown", "pn": "UNIDENTIFIED", "name": "Unindexed Component",
-                        "conf": 45, "status": "RED", "to": "N/A", "fedlog": "No Match",
-                        "notes": "Visual match low. High risk of incorrect part.", "action": "Escalate to Level 7"
-                    }
-                ]
+                # Fallback for Generic AGE
+                st.session_state.resolved_results = [{
+                    "nsn": "6115-01-512-1001", "pn": "GEN-TX-501", "name": "Generator Set",
+                    "conf": 88, "status": "YELLOW", "to": "TO 35C2-3-445-1", 
+                    "notes": "Verify model variant matches image.", "action": "Verify in TO"
+                }]
         st.rerun()
 
 with col2:
-    st.header("2. NSN Resolution & Risk Assessment")
+    st.header("2. NSN Resolution & Validation")
     if not st.session_state.resolved_results:
-        st.info("Awaiting validation. Select FSC and Stage for Request.")
+        st.info("New inputs detected. Please Stage for Request to refresh logs.")
     else:
         for item in st.session_state.resolved_results:
-            # Risk-based UI Coloring
             b_color = {"GREEN": "green", "YELLOW": "orange", "RED": "red"}[item['status']]
-            
             with st.container(border=True):
                 ca, cb = st.columns([3, 1])
                 with ca:
                     st.markdown(f"### NSN: {item['nsn']}")
                     st.write(f"**PN:** {item['pn']} | **TO:** :blue[{item['to']}]")
-                    st.caption(f"**Note:** {item['notes']}")
-                    st.markdown(f"**Action:** :{b_color}[{item['action']}]")
-                
+                    st.markdown(f"**Required Action:** :{b_color}[{item['action']}]")
                 with cb:
                     st.metric("Confidence", f"{item['conf']}%")
                     if item['status'] != "RED":
                         qty = st.number_input("Qty", min_value=1, key=f"q_{item['nsn']}")
                         if st.button("Stage Part", key=f"btn_{item['nsn']}"):
-                            # Updates the dict with the latest quantity
                             st.session_state.cart[item['nsn']] = {"pn": item['pn'], "qty": qty}
                             st.rerun()
