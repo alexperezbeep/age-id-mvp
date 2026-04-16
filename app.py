@@ -1,9 +1,11 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 
-# 1. UI Setup
-st.set_page_config(page_title="AF AGE Identifier", page_icon="🛠️")
+# 1. Page Config
+st.set_page_config(page_title="AF AGE Identifier", page_icon="🛠️", layout="centered")
+
 st.title("🛠️ AGE Context-Lock Identifier")
 st.caption("Standardized Visual-First Profiling | 92nd MXS")
 
@@ -25,12 +27,9 @@ if uploaded_file:
 
     if st.button("🚀 EXECUTE LOGISTICS LOCK"):
         api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
         
-        # 2026 UPDATE: Switching to Gemini 3 Flash
-        # This resolves the 404 error by using an active model
-        model = genai.GenerativeModel('gemini-3-flash-preview', 
-                                    tools=[{'google_search_retrieval': {}}])
+        # 2026 SDK: Initialize the Client
+        client = genai.Client(api_key=api_key)
         
         prompt = f"""
         ACT AS A USAF LOGISTICS EXPERT. 
@@ -39,17 +38,19 @@ if uploaded_file:
         If 'Legacy' is selected, you MUST prioritize the Davey H-1 (NSN 4520-01-056-4269).
         If 'Modern' is selected, prioritize the NGH-1 or MH-1 models.
         
-        Provide:
-        1. Confirmed NSN and Nomenclature.
-        2. Visual Differentiators (why it matches the photo).
-        3. Relevant Technical Order (T.O.) number.
+        Provide the Top 3 NSN matches and the relevant T.O. number.
         """
         
         try:
-            response = model.generate_content([prompt, img])
+            # 2026 SYNTAX: Using 'google_search' instead of 'google_search_retrieval'
+            response = client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=[prompt, img],
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())]
+                )
+            )
             st.success("Logistics Identified")
             st.markdown(response.text)
         except Exception as e:
-            # Fallback in case 'preview' tags change during the demo
-            st.error(f"Execution Error: {e}")
-            st.info("Try changing the model string to 'gemini-3-flash' if preview is restricted.")
+            st.error(f"Logic Error: {e}")
