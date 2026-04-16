@@ -12,7 +12,7 @@ st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #f0f2f6; }
     
-    /* SYMMETRY FIX: Unified Logistics Card Style */
+    /* SYMMETRY: Unified Logistics Card Style */
     .logistics-card {
         background-color: #1a1d2e; border: 2px solid #2d314c;
         border-radius: 12px; padding: 20px;
@@ -24,81 +24,37 @@ st.markdown("""
     .primary-lock { color: #00d4ff; border-left: 5px solid #00d4ff; padding-left: 15px; }
     .alternative-lock { color: #f0f2f6; border-left: 5px solid #2d314c; padding-left: 15px; }
 
-    /* ADVANCED WARZONE LOADER */
-    #warzone-loader-container {
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(14, 17, 23, 0.95); z-index: 9999;
-        display: none; flex-direction: column; justify-content: center; align-items: center;
+    /* WARZONE LOADER ANIMATION */
+    @keyframes fly { from { left: -10%; } to { left: 100%; } }
+    .warzone-container {
+        position: relative; width: 100%; height: 60px;
+        background: #0e1117; border: 1px solid #2d314c;
+        border-radius: 8px; overflow: hidden; margin: 20px 0;
     }
-    #falcon-path {
-        width: 80%; height: 20px; background-color: #2d314c;
-        border-radius: 10px; position: relative; overflow: hidden;
+    .warzone-bg {
+        position: absolute; width: 100%; height: 100%;
+        opacity: 0.1; font-family: monospace; font-size: 10px;
+        white-space: pre; color: #00d4ff;
     }
-    #falcon-progress {
-        height: 100%; background-color: #00d4ff;
-        width: 0%; border-radius: 10px; transition: width 0.1s linear;
+    .falcon-flyer {
+        position: absolute; top: 15px; left: -10%;
+        font-size: 24px; animation: fly 3s linear infinite;
     }
-    #falcon-silhouette {
-        position: absolute; top: -15px; left: 0%;
-        font-size: 35px; color: #00d4ff;
-        transition: left 0.1s linear;
+    .progress-bar-fill {
+        height: 100%; background: rgba(0, 212, 255, 0.2);
+        width: 0%; transition: width 0.1s linear;
     }
-    #loading-text { color: #00d4ff; font-family: monospace; font-weight: bold; margin-top: 15px; }
-    
-    /* Simple inline JS to trigger the loader on button click */
-    script { display: none; }
     </style>
-    <script>
-    function showWarzoneLoader() {
-        document.getElementById('warzone-loader-container').style.display = 'flex';
-        let progress = 0;
-        const progressBar = document.getElementById('falcon-progress');
-        const silhouette = document.getElementById('falcon-silhouette');
-        
-        const interval = setInterval(() => {
-            progress += 1; // 1% per tick
-            progressBar.style.width = progress + '%';
-            silhouette.style.left = progress + '%';
-            
-            if (progress >= 100) {
-                clearInterval(interval);
-                // The form submission will reload the page and hide the loader
-            }
-        }, 30); // 3 seconds total duration (approx)
-    }
-    </script>
     """, unsafe_allow_html=True)
 
-# --- 2. ADVANCED WARZONE LOADER HTML (Hidden until trigger) ---
-# For the demo, we use emojis to represent the tactical elements of the map.
-st.markdown("""
-<div id="warzone-loader-container">
-    <div id="loading-map" style="font-family: monospace; white-space: pre; color: #f0f2f6; opacity: 0.3; font-size: 1.1em; margin-bottom: 30px;">
-    [TAC_MAP_92MXS]
-    <br>🏔️🏔️      [DLA_DB]      🏝️
-    <br>      🚁                  
-    <br>   🟥 [H-1]          🟦 [HQ]
-    <br>                      
-    <br>      🏔️🏔️ [MINOT]         🏔️
-    </div>
-    <div id="falcon-path">
-        <div id="falcon-progress"></div>
-        <div id="falcon-silhouette">🦅</div>
-    </div>
-    <p id="loading-text">FALCON STRIKE: SCRUBBING GROUND SUPPORT DATA...</p>
-</div>
-""", unsafe_allow_html=True)
-
-# 3. Sidebar (Command Dashboard)
+# 2. Sidebar (Command Dashboard)
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=70)
     st.title("Falcon Dashboard")
-    st.info("Status: 🦅 Logistics Recognition Active")
-    st.divider()
     selected_domain = st.selectbox("Technical Class:", ["Ground Support Equipment", "Engine", "Electrical", "Hydraulic"])
     user_cues = st.text_input("Refinement (P/N, Casting #, or Marks):", placeholder="Ex: idk")
 
-# 4. Execution Interface
+# 3. Execution Interface
 col_left, col_right = st.columns([1, 1.4])
 
 with col_left:
@@ -108,73 +64,67 @@ with col_left:
         img = Image.open(uploaded_file)
         st.image(img, caption="Flight Line Unit", use_container_width=True)
         
-        # Trigger loader via simple JS on click
-        st.markdown('<button onclick="showWarzoneLoader()" style="width:100%; padding:10px; background-color:#1a1d2e; border: 2px solid #2d314c; color: #f0f2f6; border-radius:8px; cursor:pointer;">🚀 EXECUTE LOGISTICS LOCK</button>', unsafe_allow_html=True)
-        
-        # Streamlit doesn't handle JS triggers well with its own buttons. 
-        # For the final code, this requires integrating a Streamlit component.
-        # As a demo fallback, we use a hidden form to reload.
-        with st.form("exec_form", clear_on_submit=True):
-             execute = st.form_submit_submit_button("LOCK", help="Trigger API call and loader", use_container_width=True)
+        with st.form("exec_form"):
+             # FIXED: Corrected function name here
+             execute = st.form_submit_button("🚀 EXECUTE LOGISTICS LOCK", use_container_width=True)
 
 with col_right:
     st.header("2. Logistics Audit Trail")
     
-    # We use a simulated execute here to always show results after upload for the demo.
-    # Replace 'True' with 'uploaded_file and execute' in your live script.
-    if uploaded_file: 
-        # Add a small delay so the loader can fly before results render
-        time.sleep(3.5)
+    if uploaded_file and execute:
+        # --- WARZONE LOADER RENDER ---
+        loader_placeholder = st.empty()
+        for percent in range(0, 101, 5):
+            loader_placeholder.markdown(f"""
+            <div class="warzone-container">
+                <div class="warzone-bg">MTN_TERRAIN_01 // OBSTACLE_REMOVED // DLA_LINK_ESTABLISHED</div>
+                <div class="progress-bar-fill" style="width: {percent}%;"></div>
+                <div class="falcon-flyer" style="left: {percent-5}%;">🦅</div>
+            </div>
+            <p style="text-align:center; color:#00d4ff; font-family:monospace;">STRIKE STATUS: {percent}% COMPLETE</p>
+            """, unsafe_allow_html=True)
+            time.sleep(0.1)
+        loader_placeholder.empty()
+
+        # API Call
+        client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+        prompt = "Identify Primary NSN + 2 High-Confidence Alternatives. FORMAT: NSN_1: [NSN] | KEY_1: [Nomenclature] etc. Include a '---REPORT---' section."
         
-        # simulated response (replace with Gemini API call)
-        res_text = """
-        NSN_1: 4520-00-541-1115 | KEY_1: HEATER, DUCT TYPE, PORTABLE (MODEL H-1)
-        NSN_2: 4520-01-439-1682 | KEY_2: HEATER, DUCT TYPE, PORTABLE (MODEL H-120-1 / ASH)
-        NSN_3: 4520-01-496-4100 | KEY_3: NEW GENERATION HEATER (NGH) - SYSTEM REPLACEMENT
-        """
-        
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=[prompt, img],
+            config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
+        )
+        res_text = response.text
+
+        # 4. Symmetric Logistics Cards
         st.subheader("🛡️ Verified Logistics Matches")
-        
-        # Extraction logic
         matches = re.findall(r"NSN_(\d+):\s*([\d-]+)\s*\|\s*KEY_\1:\s*(.*)", res_text)
 
-        if not matches:
-            st.warning("No precise NSN lock. Reviewing Backlog...")
-        else:
+        if matches:
             for i, nsn, key in matches:
-                # SYMMETRY FIX: Unified Logistics Card Structure
-                # Directly injecting HTML for precise layout control
                 img_url = f"https://www.iso-group.com/Public/Images/NSN/{nsn.strip()}.jpg"
-                
                 header_style = "primary-lock" if i == "1" else "alternative-lock"
                 badge = "🥇 PRIMARY LOCK" if i == "1" else f"🥈 ALTERNATIVE {i}"
-                success_note = '<div style="background-color: #1e3a1e; border: 1px solid #3a7a3a; color: #c4fcc4; padding: 10px; border-radius: 5px; margin-top: 10px; font-size: 0.9em; font-weight: bold;">Logistics Match Confirmed via Visual Anchors.</div>' if i == '1' else ''
-
+                
                 st.markdown(f"""
                 <div class="logistics-card">
                     <div class="card-header {header_style}">{badge}</div>
                     <div style="display: flex; gap: 20px; align-items: start; margin-top: 15px;">
                         <div style="flex: 1; max-width: 150px; text-align: center;">
-                            <img src="{img_url}" alt="DLA Source IPB" style="width: 100%; border: 1px solid #2d314c; border-radius: 8px;">
-                            <p style="font-family: monospace; font-size: 0.8em; color: #f0f2f6; margin-top: 5px;">IPB Diagram: {nsn}</p>
+                            <img src="{img_url}" style="width: 100%; border: 1px solid #2d314c; border-radius: 8px;">
+                            <p style="font-family: monospace; font-size: 0.7em; color: #888; margin-top: 5px;">IPB: {nsn}</p>
                         </div>
                         <div style="flex: 2;">
-                            <code style="display: block; font-family: monospace; background-color: #0e1117; padding: 10px; border-radius: 5px; font-size: 1em; color: #f0f2f6; margin-bottom: 10px;">NSN: {nsn}</code>
-                            <p style="margin: 0;"><strong>Nomenclature:</strong> {key}</p>
-                            {success_note}
+                            <code style="display: block; background: #0e1117; padding: 8px; border-radius: 4px; margin-bottom: 8px;">NSN: {nsn}</code>
+                            <p style="margin: 0; font-size: 0.95em;"><strong>Nomenclature:</strong> {key}</p>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-        # 5. Backlog
+        
         with st.expander("🔍 View Technical Backlog (10 Leads)"):
-            st.write("Broader taxonomy matches below:")
-            # Logic to print the backlog from AI response
-            st.code("4520-00-511-2092 (Legacy H-1 Variant)")
-            st.code("4520-01-329-3451 (H-45 Medium Space Heater)")
-            # ... add other backlog entries here ...
+            st.markdown(res_text.split("---REPORT---")[-1] if "---REPORT---" in res_text else "Audit Complete.")
 
         if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
             st.balloons()
-            st.toast("Full Audit transmitted to Production Superintendent.")
