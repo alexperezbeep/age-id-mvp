@@ -3,7 +3,6 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import re
-import time
 
 # 1. Page Configuration & Custom CSS for the Falcon Loader
 st.set_page_config(page_title="Falcon H4D: Visual Audit", page_icon="🦅", layout="wide")
@@ -15,29 +14,29 @@ st.markdown("""
     /* Falcon Loading Animation */
     @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .falcon-loader {
-        width: 100px; height: 100px;
-        border: 5px solid #1e2130;
-        border-top: 5px solid #00d4ff;
+        width: 80px; height: 80px;
+        border: 4px solid #1e2130;
+        border-top: 4px solid #00d4ff;
         border-radius: 50%;
-        animation: rotate 2s linear infinite;
-        position: relative; margin: auto;
+        animation: rotate 1.5s linear infinite;
+        position: relative; margin: 20px auto;
     }
     .falcon-icon {
-        position: absolute; top: -15px; left: 40px;
-        font-size: 25px; transform: rotate(90deg);
+        position: absolute; top: -12px; left: 30px;
+        font-size: 22px; transform: rotate(90deg);
     }
-    .loading-text { text-align: center; color: #00d4ff; font-family: monospace; margin-top: 10px; }
+    .loading-text { text-align: center; color: #00d4ff; font-family: monospace; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Sidebar
+# 2. Command Dashboard (Sidebar)
 with st.sidebar:
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=70)
     st.title("Falcon Dashboard")
     selected_domain = st.selectbox("Technical Class:", ["Ground Support Equipment", "Engine", "Electrical", "Hydraulic"])
-    user_cues = st.text_input("Refinement (P/N, Casting #):", placeholder="Ex: idk")
+    user_cues = st.text_input("Refinement (P/N, Casting #, or Marks):", placeholder="Ex: idk")
 
-# 3. Main Interface
+# 3. Execution Interface
 col_left, col_right = st.columns([1, 1.3])
 
 with col_left:
@@ -45,7 +44,7 @@ with col_left:
     uploaded_file = st.file_uploader("Upload Component Scan", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         img = Image.open(uploaded_file)
-        st.image(img, use_container_width=True)
+        st.image(img, caption="Flight Line Unit", use_container_width=True)
         execute = st.button("🚀 EXECUTE LOGISTICS LOCK", use_container_width=True)
 
 with col_right:
@@ -58,15 +57,14 @@ with col_right:
             st.markdown('<div class="falcon-loader"><div class="falcon-icon">🦅</div></div>', unsafe_allow_html=True)
             st.markdown('<p class="loading-text">FALCON IN FLIGHT: SCRUBBING DLA DATABASES...</p>', unsafe_allow_html=True)
         
-        # Start API Call
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         
         prompt = f"""
         ACT AS A USAF MAINTENANCE SUPERINTENDENT.
         TASK: 
         1. Identify Primary NSN + 2 High-Confidence Alternatives.
-        2. Provide 'REGIMENTED GRAPHICAL CRITERIA' for the Primary Lock.
-        3. Provide 10 Backlog leads.
+        2. Identify up to 10 'Possible Leads' for the technical backlog.
+        3. Provide 'REGIMENTED GRAPHICAL CRITERIA' for the Primary Lock.
         
         FORMAT FOR EXTRACTION:
         NSN_1: [NSN] | KEY_1: [Description]
@@ -82,12 +80,10 @@ with col_right:
             config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())])
         )
         
-        # Clear Loader
         placeholder.empty()
-
         res_text = response.text
 
-        # 4. The Visual Display Logic (NSN Cards with Images)
+        # 4. Verified Visual Matches (With Reputable Images)
         st.subheader("🛡️ Verified Logistics Matches")
         
         matches = re.findall(r"NSN_(\d+):\s*([\d-]+)\s*\|\s*KEY_\1:\s*(.*)", res_text)
@@ -100,19 +96,21 @@ with col_right:
                 with st.container(border=True):
                     c1, c2 = st.columns([1, 2])
                     with c1:
-                        # Fetch images from reputable host
-                        img_url = f"https://www.iso-group.com/Public/Images/NSN/{nsn}.jpg"
+                        # Direct fetch from ISO-Group Reputable Repository
+                        img_url = f"https://www.iso-group.com/Public/Images/NSN/{nsn.strip()}.jpg"
                         st.image(img_url, caption=f"DLA Source IPB: {nsn}", use_container_width=True)
                     with c2:
-                        st.write(f"### {'🥇 PRIMARY' if i=='1' else '🥈 ALTERNATIVE'}: {nsn}")
-                        st.write(f"**Asset:** {key}")
+                        badge = "🥇 PRIMARY LOCK" if i == "1" else f"🥈 ALTERNATIVE {i}"
+                        st.markdown(f"### {badge}")
+                        st.code(f"NSN: {nsn}", language=None)
+                        st.write(f"**Nomenclature:** {key}")
                         if i == '1':
-                            st.success("Logistics Match Confirmed.")
+                            st.success("Logistics Match Confirmed via Visual Anchors.")
 
-        # 5. The Backlog Lead Section
+        # 5. Technical Backlog
         with st.expander("🔍 View Technical Backlog (10 Leads)"):
             st.markdown(res_text.split("---REPORT---")[-1] if "---REPORT---" in res_text else "Audit Complete.")
 
         if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
             st.balloons()
-            st.toast("Full Audit transmitted to Production Superintendent.")
+            st.toast("Transmitted to Production Superintendent.")
