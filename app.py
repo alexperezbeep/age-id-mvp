@@ -21,7 +21,7 @@ with st.sidebar:
     # LAYER 1: Asset Taxonomy
     mode = st.radio("Asset Taxonomy", ["Equipment (AGE)", "Part / Component", "Unknown"], index=2)
     
-    # LAYER 1: Functional Categories (Expanded)
+    # LAYER 1: Functional Categories
     if mode == "Equipment (AGE)":
         class_options = [
             "Ground Support Equipment (AGE)", "Power Generation", "Hydraulic Stands", 
@@ -76,32 +76,32 @@ with col1:
                 if conf < 60: return "Low Confidence / Unknown"
                 return "Medium Confidence / Ambiguous"
             
-            # --- RESOLUTION LOGIC WITH PLAIN ENGLISH NAMES ---
+            # --- RESOLUTION LOGIC WITH OFFICIAL NOMENCLATURE ---
             
             # CASE A: POWER GEN EQUIPMENT
             if "eb 0402" in f_low or (selected_class == "Power Generation" and mode == "Equipment (AGE)"):
                 st.session_state.resolved_results = [
-                    {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Diesel Generator Set", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order", "decision": get_decision_cat(98)},
-                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Electric Generator Set", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)}
+                    {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Generator Set, Diesel (A/M32A-60A)", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order", "decision": get_decision_cat(98)},
+                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Generator Set, Electric (A/M32A-86)", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)}
                 ]
             
             # CASE B: HYDRAULIC PARTS
             elif "valve" in f_low or "moog" in f_low or (selected_class == "Hydraulic" and mode == "Part / Component"):
                 st.session_state.resolved_results = [
-                    {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Hydraulic Servo Valve", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order", "decision": get_decision_cat(97)},
-                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Low Flow Valve", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)}
+                    {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Servo Valve, Hydraulic (Moog)", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order", "decision": get_decision_cat(97)},
+                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow (Hydraulic)", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)}
                 ]
 
-            # CASE C: CONSUMABLES
+            # CASE C: GASKETS / CONSUMABLES
             elif "gasket" in f_low or (selected_class == "Consumable" and mode == "Part / Component"):
                 st.session_state.resolved_results = [
-                    {"nsn": "5330-01-123-4567", "pn": "CESSNA-2-1/4", "name": "Fuel Tank Cap Gasket", "conf": 92, "status": "GREEN", "to": "Manual lookup", "action": "Ready to Order", "decision": "Consumable / Routine Replacement"}
+                    {"nsn": "5330-01-123-4567", "pn": "CESSNA-2-1/4", "name": "Gasket, Fuel Tank Cap", "conf": 92, "status": "GREEN", "to": "Manual lookup", "action": "Ready to Order", "decision": "Consumable / Routine Replacement"}
                 ]
             
-            # DEFAULT CASE: Mismatched Category or Unknown
+            # DEFAULT CASE
             else:
                 st.session_state.resolved_results = [
-                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "Unidentified Component", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual", "decision": get_decision_cat(60, "Multiple")}
+                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "Ambiguous Match - Review Required", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual", "decision": get_decision_cat(60, "Multiple")}
                 ]
         st.rerun()
 
@@ -120,10 +120,10 @@ with col2:
             with st.container(border=True):
                 ca, cb = st.columns([3, 1])
                 with ca:
-                    # UPDATED: Prominent Plain English Nomenclature
+                    # OFFICIAL NOMENCLATURE HEADER
                     st.markdown(f"### {item['name']}")
                     st.write(f"**NSN:** {item['nsn']} | **PN:** {item['pn']}")
-                    st.caption(f"🛡️ **Decision Category:** {item.get('decision', 'Review Required')}")
+                    st.caption(f"🛡️ **Decision Category:** {item.get('decision', 'Logistics Review Required')}")
                     st.write(f"**TO Reference:** :blue[{item['to']}]")
                     st.markdown(f"**Action:** :{b_color}[{item['action']}]")
                 with cb:
@@ -142,7 +142,7 @@ with col2:
                     with st.container(border=True):
                         cols = st.columns([3, 1])
                         with cols[0]:
-                            st.write(f"**Name:** {item['name']}")
+                            st.write(f"**Official Name:** {item['name']}")
                             st.write(f"**NSN:** {item['nsn']} | **PN:** {item['pn']}")
                         with cols[1]:
                             st.write(f"**{item['conf']}%**")
