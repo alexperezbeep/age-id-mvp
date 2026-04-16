@@ -7,13 +7,14 @@ import re
 # 1. Page Configuration
 st.set_page_config(page_title="Falcon H4D MVP", page_icon="🦅", layout="wide")
 
-# Custom CSS for dark-mode military aesthetic
+# Custom UI Styling (Military Dark Mode)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
     div[data-testid="stMetricValue"] { font-size: 28px; color: #00d4ff; }
     div[data-testid="stMetricDelta"] { font-size: 16px; }
     h1, h2, h3 { color: #f0f2f6; }
+    .stAlert { border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -40,14 +41,14 @@ with st.sidebar:
     selected_profile = st.radio("Visual Profile:", profiles.get(selected_domain))
 
     st.subheader("Step 3: Descriptive Cues")
-    user_cues = st.text_input("Refinement (Part #, Casting #, Marks)", placeholder="Ex: P/N 827482")
+    user_cues = st.text_input("Refinement (Part #, Casting #, Marks)", placeholder="Ex: Casting #23505677")
 
-# 3. Main Interface
+# 3. Main Interface: Scanner & Results
 col_left, col_right = st.columns([1, 1.2])
 
 with col_left:
     st.header("1. Access Scanner")
-    uploaded_file = st.file_uploader("Upload component photo", type=["jpg", "jpeg", "png"])
+    uploaded_file = st.file_uploader("Drop component photo for recognition", type=["jpg", "jpeg", "png"])
     
     if uploaded_file:
         img = Image.open(uploaded_file)
@@ -60,19 +61,20 @@ with col_right:
     if uploaded_file and execute:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         
-        with st.status("Regimenting Technical Data...", expanded=True) as status:
+        with st.status("Performing Multi-Modal Taxonomy Analysis...", expanded=True) as status:
             prompt = f"""
             ACT AS A USAF MAINTENANCE SUPERINTENDENT.
             DOMAIN: {selected_domain} | PROFILE: {selected_profile} | CUES: {user_cues}
             
             TASK:
-            1. Identify the TOP 3 Logistics Matches (NSNs or CAGE/MPN for COTS).
-            2. For EACH match, provide this regimented breakdown:
-               - Confidence Score: [XX]%
-               - Source Validation: (Cite P/N, Visual Taxonomy, or Database)
-               - Technical Justification: (Why this variant?)
+            1. Identify the TOP 3 Logistics Matches (NSN, or CAGE/MPN for COTS).
+            2. For EACH match, provide a 'REGIMENTED GRAPHICAL CRITERIA' breakdown:
+               - CONFIDENCE SCORE: [XX]%
+               - VISUAL ANCHORS: List 3 specific physical features found in the image that confirm this match (e.g., '6-bolt flange', 'anodized fitting', 'specific OCR text').
+               - TECHNICAL SOURCE: Cite the T.O. IPB Figure/Index or Database used.
+               - MARGIN OF ERROR: State the specific visual ambiguity (e.g., 'Internal gasket type cannot be verified visually').
             3. Provide the Primary Technical Order (T.O.) and 2 Safety Pitfalls.
-            4. HIERARCHY: Remind user that Section Chief reports to Production Superintendent.
+            4. HIERARCHY: Explicitly state that the Section Chief reports to the Production Superintendent.
             
             FORMAT START: Return the highest confidence score as 'PRIMARY_CONFIDENCE: [XX]%' at the top.
             """
@@ -84,11 +86,10 @@ with col_right:
             )
             status.update(label="Analysis Complete", state="complete")
 
-        # Extraction Logic
+        # Dynamic Metrics Extraction
         res_text = response.text
         p_conf = re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text).group(1) if re.search(r"PRIMARY_CONFIDENCE:\s*(\d+)%", res_text) else "85"
 
-        # Interactive Metrics View
         m1, m2, m3 = st.columns(3)
         with m1:
             st.metric("Primary Match", f"{p_conf}%", delta="Target Locked")
@@ -96,12 +97,14 @@ with col_right:
         m3.metric("Procurement", "Regimented")
 
         st.divider()
-        st.subheader("📦 Supply Chain Analysis")
+        st.subheader("📦 Supply Chain & Graphical Evidence")
         
-        # Clean up text for final display
-        final_display = res_text.split("PRIMARY_CONFIDENCE")[1].split("%", 1)[1] if "PRIMARY_CONFIDENCE" in res_text else res_text
-        st.markdown(final_display)
-        
-        if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
-            st.balloons()
-            st.toast("Encrypted Data Transmitted to Section Chief.")
+        # Displaying the regimented technical data
+        with st.container(border=True):
+            # Strip the header tag and display the rest
+            final_report = res_text.split("PRIMARY_CONFIDENCE")[1].split("%", 1)[1] if "PRIMARY_CONFIDENCE" in res_text else res_text
+            st.markdown(final_report)
+            
+            if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
+                st.balloons()
+                st.toast("Encrypted Data Transmitted to Section Chief for Final Validation.")
