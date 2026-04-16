@@ -18,10 +18,10 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Component Image", type=['png', 'jpg', 'jpeg'])
     
     st.divider()
-    # REVISED: Expanded Asset Taxonomy Layer
+    # LAYER 1: Asset Taxonomy
     mode = st.radio("Asset Taxonomy", ["Equipment (AGE)", "Part / Component", "Unknown"], index=2)
     
-    # REVISED: Layer 1 - Functional / Equipment Categories
+    # LAYER 1: Functional / Equipment Categories
     if mode == "Equipment (AGE)":
         class_options = [
             "Ground Support Equipment (AGE)", "Power Generation", "Hydraulic Stands", 
@@ -37,7 +37,7 @@ with st.sidebar:
         class_options = ["Auto-Detect (Broad Scan)"]
         
     selected_class = st.selectbox("Functional Category", class_options)
-    feature = st.text_input("Distinguishing Feature", placeholder="e.g. 4-pin connector / PN 2335")
+    feature = st.text_input("Distinguishing Feature / Stamped PN", placeholder="e.g. eb 0402 / valve")
 
     # --- THE REFRESH TRIGGER ---
     current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}-{selected_class}"
@@ -63,11 +63,11 @@ with col1:
         st.image(uploaded_file, use_column_width=True)
     
     if st.button("📝 STAGE FOR SUPPLY REQUEST", type="primary", use_container_width=True):
-        with st.spinner("Locking Logistics..."):
+        with st.spinner("Analyzing Procurement Data..."):
             time.sleep(1.2)
             f_low = feature.lower()
 
-            # REVISED: Layer 2 - Procurement / Decision Helper
+            # LAYER 2: Procurement / Decision Category Logic
             def get_decision_cat(conf, nsn_type="Standard"):
                 if conf >= 95: return "High Confidence Identification"
                 if "serial" in f_low: return "Serialized / Controlled Item"
@@ -76,27 +76,29 @@ with col1:
                 if conf < 60: return "Low Confidence / Unknown"
                 return "Medium Confidence / Ambiguous"
             
-            # --- CONCRETE RESOLUTION LOGIC ---
+            # --- RESOLUTION LOGIC ---
             
-            # CASE A: POWER GEN EQUIPMENT (EB 0402)
+            # CASE A: POWER GEN EQUIPMENT (Matches "eb 0402")
             if "eb 0402" in f_low or (selected_class == "Power Generation" and mode == "Equipment (AGE)"):
                 st.session_state.resolved_results = [
                     {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Generator Set, Diesel", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order", "decision": get_decision_cat(98)},
-                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Generator Set, Electric", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)},
-                    {"nsn": "Multiple Candidates", "pn": "VARIOUS", "name": "Legacy Power Unit", "conf": 55, "status": "YELLOW", "to": "N/A", "action": "Check Fit", "decision": get_decision_cat(55, "Multiple")},
-                    {"nsn": "6115-00-000-0000", "pn": "OBSOLETE", "name": "Static Inverter", "conf": 10, "status": "RED", "to": "N/A", "action": "Wrong Asset", "decision": get_decision_cat(10)}
+                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Generator Set, Electric", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)}
                 ]
             
-            # CASE B: HYDRAULIC PARTS (MOOG SERVO)
-            elif "moog" in f_low or (selected_class == "Hydraulic" and "valve" in f_low):
+            # CASE B: HYDRAULIC PARTS (Matches "valve" or "moog")
+            elif "valve" in f_low or "moog" in f_low or (selected_class == "Hydraulic" and mode == "Part / Component"):
                 st.session_state.resolved_results = [
                     {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Valve, Servo, Hydraulic", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order", "decision": get_decision_cat(97)},
-                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)},
-                    {"nsn": "4820-01-SERIAL-99", "pn": "MOOG-S", "name": "Actuator Valve", "conf": 50, "status": "YELLOW", "to": "N/A", "action": "Check PSI", "decision": "Serialized / Controlled Item"},
-                    {"nsn": "4820-00-111-2222", "pn": "PNEU-V", "name": "Pneumatic Alternative", "conf": 15, "status": "RED", "to": "N/A", "action": "Incompatible", "decision": get_decision_cat(15)}
+                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)}
+                ]
+
+            # CASE C: GASKETS / CONSUMABLES (Matches "gasket")
+            elif "gasket" in f_low or (selected_class == "Consumable" and mode == "Part / Component"):
+                st.session_state.resolved_results = [
+                    {"nsn": "5330-01-123-4567", "pn": "CESSNA-2-1/4", "name": "Fuel Tank Cap Gasket", "conf": 92, "status": "GREEN", "to": "Manual lookup", "action": "Ready to Order", "decision": "Consumable / Routine Replacement"}
                 ]
             
-            # CASE C: BASELINE / UNIDENTIFIED
+            # DEFAULT CASE: Mismatched Category or Unknown
             else:
                 st.session_state.resolved_results = [
                     {"nsn": "Multiple", "pn": "VARIOUS", "name": "System Match", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual", "decision": get_decision_cat(60, "Multiple")}
@@ -120,8 +122,7 @@ with col2:
                 ca, cb = st.columns([3, 1])
                 with ca:
                     st.markdown(f"### NSN: {item['nsn']}")
-                    # REVISED: Decision Category Badge Display
-                    st.caption(f"🛡️ **Decision Category:** {item.get('decision', 'Consumable / Routine Replacement')}")
+                    st.caption(f"🛡️ **Decision Category:** {item.get('decision', 'Review Required')}")
                     st.write(f"**PN:** {item['pn']} | **TO:** :blue[{item['to']}]")
                     st.markdown(f"**Action:** :{b_color}[{item['action']}]")
                 with cb:
@@ -141,7 +142,7 @@ with col2:
                         cols = st.columns([3, 1])
                         with cols[0]:
                             st.write(f"**NSN:** {item['nsn']} | **PN:** {item['pn']}")
-                            st.caption(f"🛡️ **Decision:** {item.get('decision', 'Review Required')}")
+                            st.caption(f"🛡️ **Decision:** {item.get('decision', 'N/A')}")
                         with cols[1]:
                             st.write(f"**{item['conf']}%**")
                             if st.button("Stage from Backlog", key=f"bk_{item['nsn']}"):
