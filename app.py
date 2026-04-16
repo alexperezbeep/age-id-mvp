@@ -1,78 +1,96 @@
-🛠️ AGE Context-Lock Identifier
-Standardized Visual-First Profiling for the 92nd MXS
+import streamlit as st
+from google import genai
+from google.genai import types
+from PIL import Image
 
-Step 1: Select Equipment Category
-Identify Category:
+# 1. Page Config & Military-Spec UI
+st.set_page_config(page_title="AF AGE Identifier", page_icon="🛠️", layout="centered")
 
-Heater / Environmental Control
-Step 2: Describe Physical Profile
-What does it look like?
+st.markdown("""
+    <style>
+    .main { background-color: #0e1117; color: #ffffff; }
+    .stButton>button { background-color: #1f4068; color: white; border-radius: 5px; width: 100%; }
+    </style>
+    """, unsafe_allow_html=True)
 
+st.title("🛠️ AGE Context-Lock Identifier")
+st.caption("Standardized Visual-First Profiling for the 92nd MXS")
 
-[Not Sure]
+# 2. Step 1: Broad Functional Class
+st.subheader("Step 1: Select Equipment Category")
+class_options = [
+    "[Auto-Detect from Silhouette]", 
+    "Heater / Environmental Control",
+    "Air Compressor", 
+    "Generator / Power Unit",
+    "Hydraulic Test Stand",
+    "Towbar / Handling",
+    "Engine / Component Class"
+]
 
+selected_class = st.selectbox("Identify Category:", class_options)
 
-Modern (Yellow / Enclosed)
+# 3. Step 2: Generalizable Visual Filters (Iterative Logic)
+selected_profile = "[Not Sure]"
 
+if selected_class != "[Auto-Detect from Silhouette]":
+    st.subheader("Step 2: Describe Physical Profile")
+    
+    # Standardized visual traits for all categories
+    profiles = {
+        "Heater / Environmental Control": ["Modern (Yellow / Enclosed)", "Legacy (Grey / Exposed Frame)", "Small (Portable Square)"],
+        "Air Compressor": ["Low-Profile (Enclosed Box)", "Large Utility (Exposed Engine)", "High-Pressure (Dual Tank)"],
+        "Generator / Power Unit": ["Standard Box (3-Wheel)", "Flat-Front (Flight Line Style)", "Back-Up (Stationary/Large)"],
+        "Hydraulic Test Stand": ["Dual Hose (Vertical Reel)", "Compact (Horizontal)", "Electric (Indoor Style)"],
+        "Towbar / Handling": ["Telescoping (Adjustable)", "Solid Bar (Fixed Length)", "Universal (Multi-Head)"],
+        "Engine / Component Class": ["Small Diesel (Exposed/Fan)", "Large Industrial (Enclosed)", "Electrical Component"]
+    }
+    
+    current_options = profiles.get(selected_class, ["[Not Sure]"])
+    selected_profile = st.radio("What does it look like?", ["[Not Sure]"] + current_options)
 
-Legacy (Grey / Exposed Frame)
+# Final context string
+final_context = f"{selected_class} - Profile: {selected_profile}"
 
+# 4. Step 3: Scan & Identify
+st.subheader("Step 3: Scan & Identify")
+uploaded_file = st.file_uploader("Upload unit photo...", type=["jpg", "jpeg", "png"])
 
-Small (Portable Square)
+if uploaded_file:
+    img = Image.open(uploaded_file)
+    st.image(img, caption="Unit Scan", use_column_width=True)
 
-Step 3: Scan & Identify
-Upload unit photo...
-
-No file chosen
-Screens....52 AM.png
-2.7MB
-0
-Unit Scan
-
-
-google.genai.errors.ClientError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
-Traceback:
-File "/mount/src/age-id-mvp/app.py", line 87, in <module>
-    response = client.models.generate_content(
-        model="gemini-2.0-flash", # Latest model for fast extraction
-    ...<3 lines>...
-        )
-    )
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/models.py", line 6276, in generate_content
-    response = self._generate_content(
-        model=model, contents=contents, config=parsed_config
-    )
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/models.py", line 4730, in _generate_content
-    response = self._api_client.request(
-        'post', path, request_dict, http_options
-    )
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/_api_client.py", line 1537, in request
-    response = self._request(http_request, http_options, stream=False)
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/_api_client.py", line 1332, in _request
-    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
-           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/tenacity/__init__.py", line 470, in __call__
-    do = self.iter(retry_state=retry_state)
-File "/home/adminuser/venv/lib/python3.14/site-packages/tenacity/__init__.py", line 371, in iter
-    result = action(retry_state)
-File "/home/adminuser/venv/lib/python3.14/site-packages/tenacity/__init__.py", line 413, in exc_check
-    raise retry_exc.reraise()
-          ~~~~~~~~~~~~~~~~~^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/tenacity/__init__.py", line 184, in reraise
-    raise self.last_attempt.result()
-          ~~~~~~~~~~~~~~~~~~~~~~~~^^
-File "/usr/local/lib/python3.14/concurrent/futures/_base.py", line 443, in result
-    return self.__get_result()
-           ~~~~~~~~~~~~~~~~~^^
-File "/usr/local/lib/python3.14/concurrent/futures/_base.py", line 395, in __get_result
-    raise self._exception
-File "/home/adminuser/venv/lib/python3.14/site-packages/tenacity/__init__.py", line 473, in __call__
-    result = fn(*args, **kwargs)
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/_api_client.py", line 1309, in _request_once
-    errors.APIError.raise_for_response(response)
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/errors.py", line 155, in raise_for_response
-    cls.raise_error(response.status_code, response_json, response)
-    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "/home/adminuser/venv/lib/python3.14/site-packages/google/genai/errors.py", line 184, in raise_error
-    raise ClientError(status_code, response_json, response)
+    if st.button("🚀 EXECUTE LOGISTICS LOCK"):
+        api_key = st.secrets.get("GEMINI_API_KEY")
+        if not api_key:
+            st.error("API Key not found in Streamlit Secrets.")
+        else:
+            client = genai.Client(api_key=api_key)
+            
+            with st.spinner("Locking Context & Searching T.O.s..."):
+                prompt = f"""
+                Maintainer Context: {final_context}
+                
+                Identify the part in the image. 
+                - If 'Legacy' or 'Exposed Frame' is selected, prioritize older units like the Davey Compressor H-1 (NSN 4520-01-056-4269). 
+                - If 'Modern' is selected, prioritize NGH-1 or MH-1 models.
+                
+                Output:
+                1. Top 3 NSN matches with Nomenclature.
+                2. Visual Differentiators (Why this NSN fits the photo).
+                3. Primary Technical Order (T.O.) number.
+                4. Safety/Critical Maintenance Warning.
+                """
+                
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-1.5-flash", 
+                        contents=[prompt, img],
+                        config=types.GenerateContentConfig(
+                            tools=[types.Tool(google_search=types.GoogleSearch())]
+                        )
+                    )
+                    st.success("Analysis Complete")
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Logic Error: {e}")
