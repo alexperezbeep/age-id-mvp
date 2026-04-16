@@ -36,7 +36,7 @@ selected_profile = "[Not Sure]"
 if selected_class != "[Auto-Detect from Silhouette]":
     st.subheader("Step 2: Describe Physical Profile")
     
-    # Standardized visual traits for all categories
+    # Standardized visual traits for all categories to handle thousands of variants
     profiles = {
         "Heater / Environmental Control": ["Modern (Yellow / Enclosed)", "Legacy (Grey / Exposed Frame)", "Small (Portable Square)"],
         "Air Compressor": ["Low-Profile (Enclosed Box)", "Large Utility (Exposed Engine)", "High-Pressure (Dual Tank)"],
@@ -68,11 +68,12 @@ if uploaded_file:
             client = genai.Client(api_key=api_key)
             
             with st.spinner("Locking Context & Searching T.O.s..."):
+                # Instructions bridge visual traits to the legacy NSN 4520-01-056-4269
                 prompt = f"""
                 Maintainer Context: {final_context}
                 
                 Identify the part in the image. 
-                - If 'Legacy' or 'Exposed Frame' is selected, prioritize older units like the Davey Compressor H-1 (NSN 4520-01-056-4269). 
+                - If 'Legacy' or 'Exposed Frame' is selected, prioritize units like the Davey Compressor H-1 (NSN 4520-01-056-4269). 
                 - If 'Modern' is selected, prioritize NGH-1 or MH-1 models.
                 
                 Output:
@@ -83,8 +84,9 @@ if uploaded_file:
                 """
                 
                 try:
+                    # Switched to the absolute latest stable model string
                     response = client.models.generate_content(
-                        model="gemini-1.5-flash-002", 
+                        model="gemini-1.5-flash-latest", 
                         contents=[prompt, img],
                         config=types.GenerateContentConfig(
                             tools=[types.Tool(google_search=types.GoogleSearch())]
@@ -93,4 +95,4 @@ if uploaded_file:
                     st.success("Analysis Complete")
                     st.markdown(response.text)
                 except Exception as e:
-                    st.error(f"Logic Error: {e}")
+                    st.error(f"Execution Error: {e}")
