@@ -2,62 +2,46 @@ import streamlit as st
 import time
 
 # --- INITIALIZATION ---
-if 'resolved_data' not in st.session_state:
-    st.session_state.resolved_data = []
+if 'resolved_results' not in st.session_state:
+    st.session_state.resolved_results = []
 
-# --- SIDEBAR TAXONOMY ---
-with st.sidebar:
-    st.title("Falcon Dashboard")
-    uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
-    
-    st.write("### Taxonomy Selection")
-    tax_mode = st.radio("Mode", ["Equipment", "Part", "Unknown / Not Sure"], index=2)
-    
-    # DYNAMIC CATEGORY MAPPING
-    if tax_mode == "Equipment":
-        categories = ["Not Sure", "Power Generation", "Air Conditioning", "Hydraulic Test Stands"]
-    elif tax_mode == "Part":
-        categories = ["Not Sure", "Hydraulic", "Electrical", "Structural", "Pneumatic"]
-    else:
-        # If the user is totally unsure, we lock the class to "Auto-Detect"
-        categories = ["Auto-Detect Category"]
-        
-    class_selection = st.selectbox("Select Class", categories)
-    feature_text = st.text_input("Distinguishing Feature (Optional)", placeholder="e.g. red pump")
-
-# --- MAIN INTERFACE ---
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    st.header("1. Digital Inspection")
-    if uploaded_file:
-        st.image(uploaded_file, use_column_width=True)
-    
-    if st.button("🚀 EXECUTE LOGISTICS LOCK", type="primary", use_container_width=True):
-        with st.spinner("Analyzing..."):
-            time.sleep(1.5)
-            
-            # LOGIC: Handling the "Unknown" state
-            if class_selection in ["Not Sure", "Auto-Detect Category"]:
-                # The model runs a wide search across all AGE databases
-                st.session_state.resolved_data = [
-                    {"nsn": "4520-01-135-2770", "name": "Detected: Hydraulic Pump", "conf": "94%"},
-                    {"nsn": "Unknown", "name": "Manual Tech Order Review Required", "conf": "N/A"}
-                ]
-            else:
-                # Targeted search based on user input
-                st.session_state.resolved_data = [
-                    {"nsn": "4520-01-482-8571", "name": f"{class_selection} Match", "conf": "88%"}
-                ]
-        st.rerun()
+# --- SIDEBAR & DIGITAL INSPECTION ---
+# (Keep your existing sidebar logic here...)
 
 with col2:
     st.header("2. NSN Resolution")
-    if st.session_state.resolved_data:
-        for item in st.session_state.resolved_data:
-            with st.container(border=True):
-                st.write(f"**NSN: {item['nsn']}**")
-                st.write(f"Identity: {item['name']}")
-                st.write(f"Confidence: :green[{item['conf']}]")
+    
+    if not st.session_state.resolved_results:
+        st.info("Execute Logistics Lock to see results.")
     else:
-        st.info("Upload and execute lock to resolve.")
+        # 1. TOP 3 CHOICES
+        st.subheader("Top Matches")
+        top_3 = st.session_state.resolved_results[:3]
+        backlog = st.session_state.resolved_results[3:13] # Next 7-10 items
+
+        for item in top_3:
+            with st.container(border=True):
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    st.write(f"**NSN: {item['nsn']}**")
+                    # Returning Part Number if available
+                    if item.get('pn'):
+                        st.write(f"**PN: {item['pn']}**")
+                    st.caption(f"Identity: {item['name']}")
+                with c2:
+                    st.subheader(f":green[{item['conf']}]")
+                
+                st.button("Add to Supply Cart", key=f"top_{item['nsn']}")
+
+        st.divider()
+
+        # 2. BACKLOG DROPDOWN (7-10 Items)
+        if backlog:
+            with st.expander("View Additional Potential Matches (Backlog)"):
+                for item in backlog:
+                    inner_c1, inner_c2 = st.columns([4, 1])
+                    pn_str = f" | PN: {item['pn']}" if item.get('pn') else ""
+                    inner_c1.write(f"**{item['nsn']}**{pn_str} — {item['name']}")
+                    inner_c2.write(f"**{item['conf']}**")
+                    if st.button("Add", key=f"back_{item['nsn']}"):
+                        st.session_state.cart.append(item['nsn'])
