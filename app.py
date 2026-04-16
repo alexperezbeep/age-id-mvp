@@ -7,19 +7,15 @@ st.set_page_config(page_title="AF AGE Identifier", page_icon="🛠️")
 st.title("🛠️ AGE Context-Lock Identifier")
 st.caption("Standardized Visual-First Profiling | 92nd MXS")
 
-# 2. Step 1: Broad Category & Visual Profile
+# 2. Context Selection
 st.subheader("Step 1: Context Selection")
 col1, col2 = st.columns(2)
-
 with col1:
-    selected_class = st.selectbox("Equipment Category:", 
-        ["Heater", "Air Compressor", "Generator", "Hydraulic Stand", "Towbar"])
-
+    selected_class = st.selectbox("Category:", ["Heater", "Compressor", "Generator", "Towbar"])
 with col2:
-    selected_profile = st.radio("Physical Profile:", 
-        ["Modern (Yellow/Enclosed)", "Legacy (Grey/Exposed Frame)", "Compact/Portable"])
+    selected_profile = st.radio("Profile:", ["Modern (Yellow)", "Legacy (Grey)", "Small/Portable"])
 
-# 3. Step 2: Image Scan
+# 3. Image Upload
 st.subheader("Step 2: Upload Photo")
 uploaded_file = st.file_uploader("Scan unit...", type=["jpg", "jpeg", "png"])
 
@@ -28,31 +24,25 @@ if uploaded_file:
     st.image(img, use_container_width=True)
 
     if st.button("🚀 EXECUTE LOGISTICS LOCK"):
-        # This uses your existing Streamlit secret
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # This is the stable tool call for the production API
-        model = genai.GenerativeModel('gemini-1.5-flash', 
-                                    tools=[{'google_search_retrieval': {}}])
+        # We use a direct model call without extra tools to bypass the 404/v1beta issue
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
-        Identify this USAF {selected_class} equipment. 
-        Current Visual Profile: {selected_profile}.
+        ACT AS A USAF LOGISTICS EXPERT. 
+        Identify this {selected_class} with a {selected_profile} profile.
         
-        If 'Legacy' is selected, prioritize units like the Davey H-1 (NSN 4520-01-056-4269).
-        If 'Modern' is selected, prioritize NGH-1/MH-1 models.
+        If 'Legacy' is selected, you MUST prioritize the Davey H-1 (NSN 4520-01-056-4269).
+        If 'Modern' is selected, prioritize the NGH-1 or MH-1 models.
         
-        Provide:
-        1. Top 3 NSN matches.
-        2. Visual Differentiators.
-        3. Technical Order (T.O.) Number.
+        Provide the Top 3 NSN matches and the relevant T.O. number.
         """
         
         try:
-            # Stable call for vision + search
             response = model.generate_content([prompt, img])
             st.success("Logistics Identified")
             st.markdown(response.text)
         except Exception as e:
-            st.error(f"System Error: {e}")
+            st.error(f"Final Attempt Error: {e}")
