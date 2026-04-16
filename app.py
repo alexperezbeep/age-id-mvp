@@ -84,11 +84,20 @@ with col_right:
             )
             status.update(label="Analysis Complete", state="complete")
 
-        # Indentation Fix: Extraction Logic
+        # --- SAFE EXTRACTION BLOCK ---
         res_text = response.text
-        lock_name = re.search(r"LOCK:\s*(.*)\n", res_text).group(1) if "LOCK:" in res_text else "Identified Asset"
-        conf_val = re.search(r"SCORE:\s*(\d+)%", res_text).group(1) if "SCORE:" in res_text else "95"
-        tier_val = re.search(r"TIER:\s*(\w+)", res_text).group(1) if "TIER:" in res_text else "Verified"
+        
+        # Safe Lock Extraction
+        lock_match = re.search(r"LOCK:\s*(.*)", res_text)
+        lock_name = lock_match.group(1).strip() if lock_match else "Asset Identified"
+        
+        # Safe Score Extraction
+        score_match = re.search(r"SCORE:\s*(\d+)", res_text)
+        conf_val = score_match.group(1) if score_match else "95"
+        
+        # Safe Tier Extraction
+        tier_match = re.search(r"TIER:\s*(\w+)", res_text)
+        tier_val = tier_match.group(1) if tier_match else "Verified"
 
         # Metric Dashboard
         m1, m2, m3 = st.columns(3)
@@ -111,13 +120,18 @@ with col_right:
             
             # Splitting the response to show Top 3 vs Backlog
             if "BACKLOG:" in res_text:
-                main_report, backlog = res_text.split("BACKLOG:")
-                st.markdown(main_report.split("TIER:")[1])
+                parts = res_text.split("BACKLOG:")
+                # Display everything between the Tier and the Backlog
+                main_report = parts[0].split(tier_val)[-1] if tier_val in parts[0] else parts[0]
+                st.markdown(main_report)
+                
                 with st.expander("🔍 View Technical Backlog (10 Possible Leads)"):
-                    st.write("The following items match the broader visual taxonomy but require additional manual verification:")
-                    st.markdown(backlog)
+                    st.write("These items match the broader visual taxonomy but require manual verification:")
+                    st.markdown(parts[1])
             else:
-                st.markdown(res_text.split("TIER:")[1])
+                # Fallback if AI didn't format the backlog correctly
+                display_text = res_text.split(tier_val)[-1] if tier_val in res_text else res_text
+                st.markdown(display_text)
             
             if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
                 st.balloons()
