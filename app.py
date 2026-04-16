@@ -1,7 +1,8 @@
 import streamlit as st
 import time
 
-# --- 1. STATE INITIALIZATION ---
+# --- 1. ROBUST STATE INITIALIZATION ---
+# Forces the cart to a dict if it was a list in a previous session (Fixes AttributeError)
 if 'cart' not in st.session_state or isinstance(st.session_state.cart, list):
     st.session_state.cart = {} 
 if 'resolved_results' not in st.session_state:
@@ -14,38 +15,39 @@ st.set_page_config(page_title="Falcon Dashboard | H4D Phase 3", layout="wide")
 # --- 2. SIDEBAR: THE NUDGE ENGINE ---
 with st.sidebar:
     st.title("🦅 Falcon Dashboard")
+    st.caption("Decision Support for 92nd MXS")
     uploaded_file = st.file_uploader("Upload Component Image", type=['png', 'jpg', 'jpeg'])
     
     st.divider()
-    # The 'IDK' option is preserved as the neutral starting point
+    # PRESERVED: 'Unknown / Not Sure' as the default safety net
     mode = st.radio("Asset Mode", ["Equipment", "Part", "Unknown / Not Sure"], index=2)
     
-    # RESTORED: Specific categories to nudge the AI's search parameters
+    # RESTORED: Critical categories for user nudging
     if mode == "Equipment":
-        class_options = ["Power Gen", "HVAC", "Hydraulic Stands", "Towing Gear", "Light Carts"]
+        class_options = ["Power Gen", "HVAC", "Hydraulic Stands", "Towing Gear"]
     elif mode == "Part":
-        class_options = ["Hydraulic", "Electrical", "Structural", "Pneumatic", "Avionics"]
+        class_options = ["Hydraulic", "Electrical", "Structural", "Pneumatic"]
     else:
-        class_options = ["Auto-Detect (Broad Search)"]
+        class_options = ["Auto-Detect (Broad Scan)"]
         
     selected_class = st.selectbox("Select Class (Nudge AI)", class_options)
-    feature = st.text_input("Distinguishing Feature", placeholder="e.g. Pressure Switch / PN 2335")
+    feature = st.text_input("Distinguishing Feature", placeholder="e.g. 4-pin connector / PN 2335")
 
     # --- THE REFRESH TRIGGER ---
-    # Now monitors 'selected_class' so the AI refreshes when you nudge it
+    # Monitors name, mode, feature, and class. If ANY change, logs are PURGED.
     current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}-{selected_class}"
     if st.session_state.fingerprint != current_fp:
-        st.session_state.resolved_results = [] 
+        st.session_state.resolved_results = [] # Instant purge for fresh data
         st.session_state.fingerprint = current_fp
 
-    # SUPPLY CART
+    # ACTIONABLE SUPPLY REQUEST STAGE
     st.divider()
     st.write(f"### 🛒 Supply Request Stage ({len(st.session_state.cart)})")
     for nsn, data in st.session_state.cart.items():
         st.caption(f"**{data['pn']}** | Qty: {data['qty']}")
     
     if st.session_state.cart:
-        if st.button("📤 Export to ILS-S / FedLog"):
+        if st.button("📤 Export to ILS-S / Generate TO Slip", use_container_width=True):
             st.success("Manifest Staged for Logistics Review")
 
 # --- 3. MAIN INTERFACE ---
@@ -58,17 +60,11 @@ with col1:
     
     if st.button("📝 STAGE FOR SUPPLY REQUEST", type="primary", use_container_width=True):
         with st.spinner("Locking Logistics..."):
-            time.sleep(1)
+            time.sleep(1.2)
             f_low = feature.lower()
             
-            # Logic that respects the user's "Nudge"
-            if mode == "Unknown / Not Sure" and not feature:
-                st.session_state.resolved_results = [{
-                    "nsn": "Unknown", "pn": "PENDING_ID", "name": "Unindexed component",
-                    "conf": 45, "status": "RED", "to": "N/A", 
-                    "notes": "Broad scan active. Provide Class nudge for better accuracy.", "action": "Escalate to Level 7"
-                }]
-            elif "switch" in f_low or "2335" in f_low:
+            # --- BRANCH 1: HIGH-CONFIDENCE SWITCHES ---
+            if "switch" in f_low or "2335" in f_low:
                 st.session_state.resolved_results = [
                     {
                         "nsn": "5930-01-235-1271", "pn": "2335-127-11", "name": "Switch, Pressure",
@@ -76,24 +72,30 @@ with col1:
                         "notes": "Verified match via PN feature.", "action": "Ready to Order"
                     }
                 ]
-            elif selected_class == "Power Gen":
-                st.session_state.resolved_results = [{
-                    "nsn": "6115-01-512-1001", "pn": "GEN-TX-501", "name": "Generator Set",
-                    "conf": 92, "status": "GREEN", "to": "35C2-3-445-1", 
-                    "notes": "Nudge applied: Power Gen Class.", "action": "Ready to Order"
-                }]
+            
+            # --- BRANCH 2: MOOG/HYDRAULIC RESOLUTION (The Fix) ---
+            elif "moog" in f_low or ("4-pin" in f_low and selected_class == "Hydraulic"):
+                st.session_state.resolved_results = [
+                    {
+                        "nsn": "4820-01-512-1001", "pn": "G761-3000P", "name": "Valve, Servo, Hydraulic",
+                        "conf": 97, "status": "GREEN", "to": "TO 1-1-688", 
+                        "notes": "Confidence jump based on Hydraulic Class + 4-pin profile.", "action": "Ready to Order"
+                    }
+                ]
+
+            # --- BRANCH 3: THE 'IDK' / LOW-CONFIDENCE CATCH-ALL ---
             else:
                 st.session_state.resolved_results = [{
                     "nsn": "Multiple Matches", "pn": "VARIOUS", "name": "System Match",
                     "conf": 60, "status": "YELLOW", "to": "Verify in IPB", 
-                    "notes": f"Search filtered by {selected_class}.", "action": "Verify Manual"
+                    "notes": f"Broad search in {selected_class}. Nudge with Feature for 90%+", "action": "Verify Manual"
                 }]
         st.rerun()
 
 with col2:
     st.header("2. NSN Resolution & Validation")
     if not st.session_state.resolved_results:
-        st.info("Awaiting input. Select Mode/Class and Stage for Request.")
+        st.info("Input change detected. Stage for Request to see fresh logs.")
     else:
         for item in st.session_state.resolved_results:
             b_color = {"GREEN": "green", "YELLOW": "orange", "RED": "red"}[item['status']]
@@ -102,7 +104,7 @@ with col2:
                 with ca:
                     st.markdown(f"### NSN: {item['nsn']}")
                     st.write(f"**PN:** {item['pn']} | **TO:** :blue[{item['to']}]")
-                    st.markdown(f"**Action:** :{b_color}[{item['action']}]")
+                    st.markdown(f"**Required Action:** :{b_color}[{item['action']}]")
                 with cb:
                     st.metric("Confidence", f"{item['conf']}%")
                     if item['status'] != "RED":
