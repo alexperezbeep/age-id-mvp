@@ -2,14 +2,13 @@ import streamlit as st
 from PIL import Image
 import time
 
-# 1. UNIVERSAL STATE INITIALIZATION
-# This prevents KeyErrors by ensuring every variable exists before the UI calls it.
+# 1. INITIALIZE SESSION STATE (RESILIENT)
 if 'cart' not in st.session_state:
     st.session_state.cart = {}
 if 'results' not in st.session_state:
-    st.session_state.results = [] # Initialize as empty list instead of None
+    st.session_state.results = []
 
-# 2. Page Configuration & UI Styling
+# 2. Page Configuration & Improved CSS
 st.set_page_config(page_title="Falcon NSN Lock", page_icon="🦅", layout="wide")
 
 st.markdown("""
@@ -19,7 +18,7 @@ st.markdown("""
         background-color: #1a1d2e; border: 1px solid #2d314c;
         border-radius: 10px; padding: 15px; margin-bottom: 15px;
     }
-    .primary-card { border: 2px solid #00d4ff; }
+    .primary-card { border: 2px solid #00d4ff; box-shadow: 0 0 10px rgba(0, 212, 255, 0.15); }
     .conf-score { font-size: 1.5em; font-weight: 800; padding: 4px 8px; border-radius: 4px; }
     .high-conf { color: #2ecc71; background: rgba(46, 204, 113, 0.1); }
     .img-label {
@@ -29,25 +28,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Sidebar: Mission Input & Supply Cart
+# 3. Sidebar: Mission Input & Aggregated Cart
 with st.sidebar:
     st.title("Falcon Dashboard")
-    st.caption("v3.1 // Universal Taxonomy Mode")
     st.divider()
     
-    uploaded_file = st.file_uploader("Upload Component Scan", type=["jpg", "png"], label_visibility="collapsed")
+    uploaded_file = st.file_uploader("Upload Scan", type=["jpg", "png"], label_visibility="collapsed")
     
-    # TAXONOMY HIERARCHY
-    st.write("**Taxonomy**")
+    # Hierarchical Selection
+    st.write("**Taxonomy Selection**")
     id_type = st.radio("Type:", ["Equipment", "Part"], horizontal=True, label_visibility="collapsed")
     taxonomy = {
-        "Equipment": ["Heater", "Generator", "Air Compressor", "Towbar", "LOX Cart", "Jack"],
-        "Part": ["Electrical", "Fuel System", "Hydraulic", "Mechanical", "Structural", "Fasteners"]
+        "Equipment": ["Heater", "Generator", "Air Compressor", "Towbar", "LOX Cart"],
+        "Part": ["Electrical", "Fuel System", "Hydraulic", "Mechanical", "Structural"]
     }
     selected_class = st.selectbox(f"Select {id_type} Class:", options=taxonomy[id_type])
     dist_feature = st.text_input("Distinguishing Feature (Optional)", placeholder="e.g. dual exhaust")
     
-    # SUPPLY CART (Aggregated)
     st.divider()
     st.subheader("🛒 Supply Cart")
     if not st.session_state.cart:
@@ -64,11 +61,11 @@ with st.sidebar:
                     st.rerun()
         
         if st.button("📦 Submit Order", type="primary", use_container_width=True):
-            st.success("Order Sent.")
+            st.success("Logistics Tasking Sent.")
             st.session_state.cart = {}
             st.rerun()
 
-# 4. Main Viewports
+# 4. Main Operational Layout
 col_insp, col_res = st.columns([1, 1.4])
 
 with col_insp:
@@ -78,20 +75,21 @@ with col_insp:
         if st.button("🚀 EXECUTE LOGISTICS LOCK", use_container_width=True, type="primary"):
             with st.spinner("Analyzing Visual Anchors..."):
                 time.sleep(1.5)
-            # GENERATE MOCK DATA
+            # SAFE DATA GENERATION: Every dict contains a 'type' key
             st.session_state.results = [
                 {"nsn": "4520-01-135-2770", "name": f"{selected_class} (H-1)", "conf": 96, "type": "Exact Match"},
-                {"nsn": "4520-01-482-8571", "name": f"{selected_class} (NGH-1)", "conf": 82, "type": "Closest Match"}
+                {"nsn": "4520-01-482-8571", "name": f"{selected_class} (NGH-1)", "conf": 82, "type": "Closest Match"},
+                {"nsn": "4520-00-540-1444", "name": f"{selected_class} (BT400)", "conf": 62, "type": "Reference"}
             ]
             st.rerun()
 
 with col_res:
     st.header("2. NSN Resolution")
-    # THE FIX: Only attempt to iterate if the results list is not empty
     if st.session_state.results:
         for i, res in enumerate(st.session_state.results):
             is_p = (i == 0)
-            # Fallback IPB Rendering
+            # THE FIX: use .get() to avoid KeyError if the key is missing
+            img_label = res.get('type', 'Reference') 
             img_url = f"https://www.iso-group.com/Public/Images/NSN/{res['nsn']}.jpg"
             
             st.markdown(f"""
@@ -103,7 +101,7 @@ with col_res:
                 <div style="display: flex; gap: 15px; margin-top: 10px;">
                     <div style="position: relative; width: 100px; height: 100px;">
                         <img src="{img_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 5px;" onerror="this.src='https://placehold.co/200x200/1a1d2e/00d4ff?text=IPB'">
-                        <span class="img-label">{res['type']}</span>
+                        <span class="img-label">{img_label}</span>
                     </div>
                     <div>
                         <div style="font-weight: bold;">{res['name']}</div>
