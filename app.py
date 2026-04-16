@@ -21,7 +21,7 @@ with st.sidebar:
     # LAYER 1: Asset Taxonomy
     mode = st.radio("Asset Taxonomy", ["Equipment (AGE)", "Part / Component", "Unknown"], index=2)
     
-    # LAYER 1: Functional / Equipment Categories
+    # LAYER 1: Functional Categories (Expanded)
     if mode == "Equipment (AGE)":
         class_options = [
             "Ground Support Equipment (AGE)", "Power Generation", "Hydraulic Stands", 
@@ -76,23 +76,23 @@ with col1:
                 if conf < 60: return "Low Confidence / Unknown"
                 return "Medium Confidence / Ambiguous"
             
-            # --- RESOLUTION LOGIC ---
+            # --- RESOLUTION LOGIC WITH PLAIN ENGLISH NAMES ---
             
-            # CASE A: POWER GEN EQUIPMENT (Matches "eb 0402")
+            # CASE A: POWER GEN EQUIPMENT
             if "eb 0402" in f_low or (selected_class == "Power Generation" and mode == "Equipment (AGE)"):
                 st.session_state.resolved_results = [
-                    {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Generator Set, Diesel", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order", "decision": get_decision_cat(98)},
-                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Generator Set, Electric", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)}
+                    {"nsn": "6115-01-517-3204", "pn": "A/M32A-60A", "name": "Diesel Generator Set", "conf": 98, "status": "GREEN", "to": "TO 35C2-3-372-11", "action": "Ready to Order", "decision": get_decision_cat(98)},
+                    {"nsn": "6115-01-412-1100", "pn": "A/M32A-86", "name": "Electric Generator Set", "conf": 65, "status": "YELLOW", "to": "TO 35C2-3-467-1", "action": "Verify Output", "decision": get_decision_cat(65)}
                 ]
             
-            # CASE B: HYDRAULIC PARTS (Matches "valve" or "moog")
+            # CASE B: HYDRAULIC PARTS
             elif "valve" in f_low or "moog" in f_low or (selected_class == "Hydraulic" and mode == "Part / Component"):
                 st.session_state.resolved_results = [
-                    {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Valve, Servo, Hydraulic", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order", "decision": get_decision_cat(97)},
-                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)}
+                    {"nsn": "4820-01-512-1001", "pn": "G761-3001P", "name": "Hydraulic Servo Valve", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order", "decision": get_decision_cat(97)},
+                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Low Flow Valve", "conf": 75, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow", "decision": get_decision_cat(75)}
                 ]
 
-            # CASE C: GASKETS / CONSUMABLES (Matches "gasket")
+            # CASE C: CONSUMABLES
             elif "gasket" in f_low or (selected_class == "Consumable" and mode == "Part / Component"):
                 st.session_state.resolved_results = [
                     {"nsn": "5330-01-123-4567", "pn": "CESSNA-2-1/4", "name": "Fuel Tank Cap Gasket", "conf": 92, "status": "GREEN", "to": "Manual lookup", "action": "Ready to Order", "decision": "Consumable / Routine Replacement"}
@@ -101,7 +101,7 @@ with col1:
             # DEFAULT CASE: Mismatched Category or Unknown
             else:
                 st.session_state.resolved_results = [
-                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "System Match", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual", "decision": get_decision_cat(60, "Multiple")}
+                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "Unidentified Component", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual", "decision": get_decision_cat(60, "Multiple")}
                 ]
         st.rerun()
 
@@ -110,7 +110,6 @@ with col2:
     if not st.session_state.resolved_results:
         st.info("Awaiting input. Select Mode/Class and Stage for Request.")
     else:
-        # SORT AND SPLIT FOR TOP 3 + BACKLOG
         res = sorted(st.session_state.resolved_results, key=lambda x: x['conf'], reverse=True)
         top_3 = res[:3]
         backlog = res[3:]
@@ -121,9 +120,11 @@ with col2:
             with st.container(border=True):
                 ca, cb = st.columns([3, 1])
                 with ca:
-                    st.markdown(f"### NSN: {item['nsn']}")
+                    # UPDATED: Prominent Plain English Nomenclature
+                    st.markdown(f"### {item['name']}")
+                    st.write(f"**NSN:** {item['nsn']} | **PN:** {item['pn']}")
                     st.caption(f"🛡️ **Decision Category:** {item.get('decision', 'Review Required')}")
-                    st.write(f"**PN:** {item['pn']} | **TO:** :blue[{item['to']}]")
+                    st.write(f"**TO Reference:** :blue[{item['to']}]")
                     st.markdown(f"**Action:** :{b_color}[{item['action']}]")
                 with cb:
                     st.metric("Confidence", f"{item['conf']}%")
@@ -136,13 +137,13 @@ with col2:
         # BACKLOG SECTION
         if backlog:
             st.divider()
-            with st.expander(f"View Additional Potential Matches (Backlog: {len(backlog)})"):
+            with st.expander(f"Additional Potential Matches ({len(backlog)})"):
                 for item in backlog:
                     with st.container(border=True):
                         cols = st.columns([3, 1])
                         with cols[0]:
+                            st.write(f"**Name:** {item['name']}")
                             st.write(f"**NSN:** {item['nsn']} | **PN:** {item['pn']}")
-                            st.caption(f"🛡️ **Decision:** {item.get('decision', 'N/A')}")
                         with cols[1]:
                             st.write(f"**{item['conf']}%**")
                             if st.button("Stage from Backlog", key=f"bk_{item['nsn']}"):
