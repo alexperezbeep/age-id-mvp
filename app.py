@@ -3,7 +3,7 @@ from google import genai
 from google.genai import types
 from PIL import Image
 
-# 1. Page Config & Military-Spec UI
+# 1. Page Config
 st.set_page_config(page_title="AF AGE Identifier", page_icon="🛠️", layout="centered")
 
 st.markdown("""
@@ -30,13 +30,12 @@ class_options = [
 
 selected_class = st.selectbox("Identify Category:", class_options)
 
-# 3. Step 2: Generalizable Visual Filters (Iterative Logic)
+# 3. Step 2: Generalizable Visual Filters
 selected_profile = "[Not Sure]"
 
 if selected_class != "[Auto-Detect from Silhouette]":
     st.subheader("Step 2: Describe Physical Profile")
     
-    # Standardized visual traits for all categories to handle thousands of variants
     profiles = {
         "Heater / Environmental Control": ["Modern (Yellow / Enclosed)", "Legacy (Grey / Exposed Frame)", "Small (Portable Square)"],
         "Air Compressor": ["Low-Profile (Enclosed Box)", "Large Utility (Exposed Engine)", "High-Pressure (Dual Tank)"],
@@ -49,7 +48,6 @@ if selected_class != "[Auto-Detect from Silhouette]":
     current_options = profiles.get(selected_class, ["[Not Sure]"])
     selected_profile = st.radio("What does it look like?", ["[Not Sure]"] + current_options)
 
-# Final context string
 final_context = f"{selected_class} - Profile: {selected_profile}"
 
 # 4. Step 3: Scan & Identify
@@ -63,30 +61,27 @@ if uploaded_file:
     if st.button("🚀 EXECUTE LOGISTICS LOCK"):
         api_key = st.secrets.get("GEMINI_API_KEY")
         if not api_key:
-            st.error("API Key not found in Streamlit Secrets.")
+            st.error("API Key not found.")
         else:
-            client = genai.Client(api_key=api_key)
+            # Explicitly setting the client to avoid v1beta issues if possible
+            client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
             
             with st.spinner("Locking Context & Searching T.O.s..."):
-                # Instructions bridge visual traits to the legacy NSN 4520-01-056-4269
                 prompt = f"""
                 Maintainer Context: {final_context}
-                
-                Identify the part in the image. 
-                - If 'Legacy' or 'Exposed Frame' is selected, prioritize units like the Davey Compressor H-1 (NSN 4520-01-056-4269). 
-                - If 'Modern' is selected, prioritize NGH-1 or MH-1 models.
+                Task: Identify the unit. If 'Legacy' is selected, prioritize units like the Davey Compressor H-1 (NSN 4520-01-056-4269).
                 
                 Output:
-                1. Top 3 NSN matches with Nomenclature.
-                2. Visual Differentiators (Why this NSN fits the photo).
-                3. Primary Technical Order (T.O.) number.
-                4. Safety/Critical Maintenance Warning.
+                1. Top 3 NSN matches.
+                2. Visual Differentiators.
+                3. Primary T.O. Number.
+                4. Safety Warnings.
                 """
                 
                 try:
-                    # Switched to the absolute latest stable model string
+                    # Using the most basic, high-compatibility string
                     response = client.models.generate_content(
-                        model="gemini-1.5-flash-latest", 
+                        model="gemini-1.5-flash", 
                         contents=[prompt, img],
                         config=types.GenerateContentConfig(
                             tools=[types.Tool(google_search=types.GoogleSearch())]
@@ -95,4 +90,16 @@ if uploaded_file:
                     st.success("Analysis Complete")
                     st.markdown(response.text)
                 except Exception as e:
-                    st.error(f"Execution Error: {e}")
+                    # Automatic fallback if the first string fails
+                    try:
+                        response = client.models.generate_content(
+                            model="models/gemini-1.5-flash", 
+                            contents=[prompt, img],
+                            config=types.GenerateContentConfig(
+                                tools=[types.Tool(google_search=types.GoogleSearch())]
+                            )
+                        )
+                        st.success("Analysis Complete (via fallback)")
+                        st.markdown(response.text)
+                    except Exception as e2:
+                        st.error(f"Final Error: {e2}")
