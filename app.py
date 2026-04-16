@@ -1,47 +1,46 @@
 import streamlit as st
 import time
 
-# --- 1. INITIALIZATION & RESET LOGIC ---
+# --- 1. MANDATORY RESET CALLBACK ---
+def clear_on_upload():
+    """Wipes all logistics data as soon as a new file is detected"""
+    st.session_state.resolved_results = []
+    # Optionally clear the 'Distinguishing Feature' text too
+    if 'feature_input' in st.session_state:
+        st.session_state.feature_input = ""
+
+# Initialize states
 if 'resolved_results' not in st.session_state:
     st.session_state.resolved_results = []
 if 'cart' not in st.session_state:
     st.session_state.cart = []
 
-def reset_results():
-    """Callback to clear old data when a new image is uploaded"""
-    st.session_state.resolved_results = []
-
-# --- 2. SIDEBAR ---
+# --- 2. SIDEBAR WITH CALLBACKS ---
 with st.sidebar:
     st.title("Falcon Dashboard")
-    
-    # The 'on_change' trigger is the secret to the reset
+    # THE KEY: on_change triggers the clear_on_upload function immediately
     uploaded_file = st.file_uploader(
         "Upload Image", 
         type=['png', 'jpg', 'jpeg'], 
-        on_change=reset_results
+        on_change=clear_on_upload
     )
     
     st.divider()
     mode = st.radio("Mode", ["Equipment", "Part", "Unknown / Not Sure"], index=2)
     
-    if mode == "Equipment":
-        cats = ["Not Sure", "Power Gen", "HVAC", "Hydraulic Stands"]
-    elif mode == "Part":
-        cats = ["Not Sure", "Hydraulic", "Electrical", "Structural"]
-    else:
-        cats = ["Auto-Detect Category"]
-        
-    class_selection = st.selectbox("Select Class", cats)
-    feature = st.text_input("Distinguishing Feature", placeholder="e.g. Pressure Switch")
+    # Auto-adjust class options based on mode
+    class_opts = ["Auto-Detect"] if mode == "Unknown / Not Sure" else ["Hydraulic", "Electrical", "Power Gen"]
+    st.selectbox("Select Class", class_opts)
+    
+    feature = st.text_input("Distinguishing Feature", key="feature_input")
 
-    # Supply Cart
+    # Supply Cart visibility
     st.divider()
     st.write(f"### 🛒 Supply Cart ({len(st.session_state.cart)})")
     for item in st.session_state.cart:
         st.caption(f"• {item}")
 
-# --- 3. MAIN INTERFACE ---
+# --- 3. MAIN DASHBOARD ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -50,13 +49,11 @@ with col1:
         st.image(uploaded_file, use_column_width=True)
     
     if st.button("🚀 EXECUTE LOGISTICS LOCK", type="primary", use_container_width=True):
-        with st.spinner("Analyzing new visual data..."):
+        with st.spinner("Analyzing..."):
             time.sleep(1.2)
             
-            # THE LOGIC: Checks 'feature' or 'mode' to determine results
-            new_data = []
+            # Logic branch: Identify based on 'feature' or 'mode'
             f_low = feature.lower()
-            
             if "switch" in f_low or "pressure" in f_low:
                 name, ns_pre, pn_pre = "Switch, Pressure", "5930", "PN-SW-3381"
             elif mode == "Equipment":
@@ -64,39 +61,31 @@ with col1:
             else:
                 name, ns_pre, pn_pre = "Hydraulic Pump", "4520", "PN-MLW-10"
 
-            for i in range(1, 14):
-                new_data.append({
-                    "nsn": f"{ns_pre}-01-235-{1270+i}",
-                    "pn": f"{pn_pre}{i}",
-                    "name": name,
-                    "conf": f"{99 - i}%"
-                })
-            st.session_state.resolved_results = new_data
+            # Fill Top 3 + Backlog results
+            st.session_state.resolved_results = [
+                {"nsn": f"{ns_pre}-01-235-{1270+i}", "pn": f"{pn_pre}{i}", "name": name, "conf": f"{99-i}%"}
+                for i in range(1, 14)
+            ]
         st.rerun()
 
 with col2:
     st.header("2. NSN Resolution")
-    
     if not st.session_state.resolved_results:
-        # This will now show correctly as soon as you upload a new image
+        # User sees this instantly after a new upload
         st.info("New image detected. Please execute logistics lock to resolve.")
     else:
-        st.subheader("Top Matches")
+        # Render Top 3
         for item in st.session_state.resolved_results[:3]:
             with st.container(border=True):
                 ca, cb = st.columns([3, 1])
-                with ca:
-                    st.write(f"**NSN: {item['nsn']}**\n\n**PN: {item['pn']}**")
-                    st.caption(f"Identity: {item['name']}")
+                ca.write(f"**NSN: {item['nsn']}**\n\n**PN: {item['pn']}**")
+                ca.caption(f"Identity: {item['name']}")
                 cb.subheader(f":green[{item['conf']}]")
                 if st.button("Add to Supply Cart", key=f"t_{item['nsn']}"):
                     st.session_state.cart.append(f"{item['nsn']} (PN: {item['pn']})")
                     st.rerun()
 
-        st.divider()
+        # Render Backlog Dropdown
         with st.expander("View Additional Potential Matches (Backlog)"):
             for item in st.session_state.resolved_results[3:13]:
                 st.write(f"**{item['nsn']}** | PN: {item['pn']} — {item['conf']}")
-                if st.button("Add", key=f"b_{item['nsn']}"):
-                    st.session_state.cart.append(item['nsn'])
-                    st.rerun()
