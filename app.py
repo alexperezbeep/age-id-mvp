@@ -1,35 +1,97 @@
-# Dynamic Taxonomy System
+import streamlit as st
+import time
 
-## Overview
-This script implements a dynamic taxonomy system that facilitates efficient selection and management of equipment and parts categories. The following features are included:
+# --- 1. INITIALIZATION ---
+if 'resolved_data' not in st.session_state:
+    st.session_state.resolved_data = []
+if 'cart' not in st.session_state:
+    st.session_state.cart = []
 
-1. **22 Equipment Categories**: A list of equipment categories is maintained in an array.
-2. **25 Part Categories**: Corresponding part categories are structured similarly.
-3. **Dynamic Category Switching**: Based on user selection, categories update dynamically.
-4. **Searchable Dropdowns**: Users can easily search and select from dropdown menus.
-5. **NSN Resolution Logic**: The system includes logic for National Stock Number (NSN) resolutions using the taxonomy type and selected categories.
-6. **Image Association with NSNs**: Upon detecting NSNs, users can associate images with these findings, ensuring clarity on which images correlate with specific NSN results.
+st.set_page_config(page_title="Falcon Dashboard", layout="wide")
 
-## Code Implementation
+# --- 2. SIDEBAR: TAXONOMY & INPUTS ---
+with st.sidebar:
+    st.title("Falcon Dashboard")
+    
+    # Image Upload
+    uploaded_file = st.file_uploader("Upload Image", type=['png', 'jpg', 'jpeg'])
+    
+    st.divider()
+    
+    # Taxonomy Selection
+    st.write("### Taxonomy Selection")
+    tax_mode = st.radio("Mode", ["Equipment", "Part"], index=1, label_visibility="collapsed")
+    
+    # Dynamic Category Mapping
+    if tax_mode == "Equipment":
+        st.write("### Select Equipment Class")
+        categories = ["Power Generation", "Air Conditioning", "Hydraulic Test Stands", "Towing Gear"]
+    else:
+        st.write("### Select Part Class")
+        categories = ["Hydraulic", "Electrical", "Structural", "Pneumatic", "Avionics"]
+        
+    class_selection = st.selectbox("Class", categories, label_visibility="collapsed")
+    
+    # Feature Input
+    st.write("### Distinguishing Feature (Optional)")
+    feature_text = st.text_input("Feature", placeholder="e.g. pump, connector", label_visibility="collapsed")
 
-```python
-class Taxonomy:
-    def __init__(self):
-        self.equipment_categories = ["Category1", "Category2", "Category3", ..., "Category22"]
-        self.part_categories = ["Part1", "Part2", "Part3", ..., "Part25"]
+    # Supply Cart Display
+    st.divider()
+    st.write("### 🛒 Supply Cart")
+    if not st.session_state.cart:
+        st.caption("No items in cart.")
+    else:
+        for item in st.session_state.cart:
+            st.write(f"- {item}")
 
-    def dynamic_switch(self, selected_type, selected_category):
-        # Logic for switching categories based on user selection
-        pass
+# --- 3. MAIN INTERFACE: TWO-COLUMN LAYOUT ---
+col1, col2 = st.columns([1, 1])
 
-    def nsn_resolution(self, taxonomy_type, selected_category):
-        # NSN resolution logic based on taxonomy type and selected category
-        pass
+with col1:
+    st.header("1. Digital Inspection")
+    if uploaded_file:
+        st.image(uploaded_file, use_column_width=True)
+    else:
+        st.info("Awaiting image upload...")
+    
+    # THE TRIGGER
+    if st.button("🚀 EXECUTE LOGISTICS LOCK", type="primary", use_container_width=True):
+        with st.spinner(f"Resolving {tax_mode} logistics..."):
+            time.sleep(1.5) # Simulated API Latency
+            
+            # MOCK LOGIC: Changes based on input
+            if "pump" in feature_text.lower() or "punpk" in feature_text.lower():
+                st.session_state.resolved_data = [
+                    {"nsn": "4520-01-135-2770", "name": "Hydraulic (H-1)", "conf": "96%"},
+                    {"nsn": "4520-01-482-8571", "name": "Hydraulic (NGH-1)", "conf": "82%"}
+                ]
+            elif tax_mode == "Equipment":
+                st.session_state.resolved_data = [
+                    {"nsn": "6115-01-512-1234", "name": "Generator, Diesel", "conf": "91%"}
+                ]
+            else:
+                st.session_state.resolved_data = [
+                    {"nsn": "Unknown", "name": "No Exact Match Found", "conf": "0%"}
+                ]
+        st.rerun()
 
-    def upload_image(self, nsn, image_path):
-        # Logic to associate uploaded images with detected NSNs
-        pass
-
-# Example usage
-taxonomy = Taxonomy()
-
+with col2:
+    st.header("2. NSN Resolution")
+    
+    if not st.session_state.resolved_data:
+        st.info(f"Upload {tax_mode} image and execute lock.")
+    else:
+        # DYNAMIC CARD RENDERING
+        for item in st.session_state.resolved_data:
+            with st.container(border=True):
+                c_left, c_right = st.columns([3, 1])
+                with c_left:
+                    st.write(f"**NSN: {item['nsn']}**")
+                    st.caption(f"{item['name']}\nLogistics Match Confirmed via Visual Anchors.")
+                with c_right:
+                    st.subheader(f":green[{item['conf']}]")
+                
+                if st.button(f"Add to Cart", key=item['nsn']):
+                    st.session_state.cart.append(f"{item['name']} ({item['nsn']})")
+                    st.toast(f"Logged {item['nsn']} for Production Superintendent review.")
