@@ -4,40 +4,14 @@ from google.genai import types
 from PIL import Image
 import re
 
-# 1. Page Configuration & Aesthetic
+# 1. Page Configuration
 st.set_page_config(page_title="Falcon H4D: Logistics Audit", page_icon="🦅", layout="wide")
-
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stMetricValue"] { font-size: 28px; color: #00d4ff; }
-    div[data-testid="stMetricDelta"] { font-size: 14px; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
 
 # 2. Command Dashboard (Sidebar)
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Seal_of_the_United_States_Department_of_the_Air_Force.svg/1200px-Seal_of_the_United_States_Department_of_the_Air_Force.svg.png", width=70)
     st.title("Falcon Dashboard")
-    st.info("Status: 🦅 Logistics Recognition Active")
-    
-    st.divider()
-    
-    st.subheader("Step 1: Domain Selection")
-    domains = ["Ground Support Equipment", "Engine / Powerplant", "Electrical / Avionics", "Hydraulic / Pneumatic", "Hardware / Universal"]
-    selected_domain = st.selectbox("Technical Class:", domains)
-
-    st.subheader("Step 2: Describe Profile")
-    profiles = {
-        "Ground Support Equipment": ["Mobile/Trailer", "Stationary", "Hand-Held"],
-        "Engine / Powerplant": ["Internal/Closed", "External/Exposed", "Fuel/Oil System"],
-        "Electrical / Avionics": ["Sealed/Relay Style", "Wiring/Harness", "Control Panel"],
-        "Hydraulic / Pneumatic": ["Pump/Motor", "Valve/Manifold", "Hose/Fitting"],
-        "Hardware / Universal": ["Fastener/Bracket", "Housing/Casing", "Unknown/Other"]
-    }
-    selected_profile = st.radio("Visual Profile:", profiles.get(selected_domain))
-
-    st.subheader("Step 3: Technical Refinement")
+    selected_domain = st.selectbox("Technical Class:", ["Ground Support Equipment", "Engine / Powerplant", "Electrical", "Hydraulic", "Hardware"])
+    selected_profile = st.radio("Visual Profile:", ["Mobile/Trailer", "Stationary", "Hand-Held"])
     user_cues = st.text_input("Input P/N, Casting #, or Marks:", placeholder="Ex: P/N 827482")
 
 # 3. Execution Interface
@@ -48,7 +22,7 @@ with col_left:
     uploaded_file = st.file_uploader("Upload Component Scan", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         img = Image.open(uploaded_file)
-        st.image(img, caption="Unit under inspection", use_container_width=True)
+        st.image(img, use_container_width=True)
         execute = st.button("🚀 EXECUTE LOGISTICS LOCK", use_container_width=True)
 
 with col_right:
@@ -57,24 +31,27 @@ with col_right:
     if uploaded_file and execute:
         client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
         
-        with st.status("Regimenting Technical Data...", expanded=True) as status:
+        with st.status("Performing Multi-Lead Analysis...", expanded=True) as status:
             prompt = f"""
             ACT AS A USAF MAINTENANCE SUPERINTENDENT.
             DOMAIN: {selected_domain} | PROFILE: {selected_profile} | CUES: {user_cues}
             
-            TASK:
-            1. Identify the SINGLE 'Primary Lock' (NSN or CAGE/MPN).
-            2. Identify 2 additional 'High-Confidence' alternative matches.
-            3. Identify up to 10 'Possible Leads' for the technical backlog.
-            4. For the Primary Lock, provide a 'REGIMENTED GRAPHICAL CRITERIA' breakdown:
-               - CONFIDENCE SCORE: [XX]%
-               - TIER: (Verified/Probable/Assisted)
-               - VISUAL ANCHORS: List 3 specific physical features found in the image.
-               - LOGIC GAP: What remains unverified?
-               - TECHNICAL SOURCE: T.O. or Database.
-            5. HIERARCHY: State that Section Chief reports to Production Superintendent.
+            MANDATORY TASK:
+            1. Identify the 'Primary Lock' (Highest Confidence NSN).
+            2. Identify 2 'High-Confidence' alternative NSNs (interchangeable or similar).
+            3. Identify up to 10 'Possible Leads' (Lower confidence backlog).
+            4. Provide GRAPHICAL CRITERIA for the Primary Lock.
             
-            FORMAT START: Return the data as 'LOCK: [NSN]' followed by 'SCORE: [XX]%' and 'TIER: [TIER]' at the top.
+            FORMAT:
+            LOCK: [NSN]
+            SCORE: [XX]%
+            TIER: [TIER]
+            ---PRIMARY REPORT---
+            [Detailed Criteria]
+            ---ALTERNATIVES---
+            [List Top 2 Alt NSNs with 1-sentence justification each]
+            ---BACKLOG---
+            [List 10 Possible Leads]
             """
             
             response = client.models.generate_content(
@@ -84,55 +61,38 @@ with col_right:
             )
             status.update(label="Analysis Complete", state="complete")
 
-        # --- SAFE EXTRACTION BLOCK ---
         res_text = response.text
         
-        # Safe Lock Extraction
-        lock_match = re.search(r"LOCK:\s*(.*)", res_text)
-        lock_name = lock_match.group(1).strip() if lock_match else "Asset Identified"
-        
-        # Safe Score Extraction
-        score_match = re.search(r"SCORE:\s*(\d+)", res_text)
-        conf_val = score_match.group(1) if score_match else "95"
-        
-        # Safe Tier Extraction
-        tier_match = re.search(r"TIER:\s*(\w+)", res_text)
-        tier_val = tier_match.group(1) if tier_match else "Verified"
+        # Safe Extractions
+        lock_name = re.search(r"LOCK:\s*(.*)", res_text).group(1).strip() if "LOCK:" in res_text else "Asset Identified"
+        conf_val = re.search(r"SCORE:\s*(\d+)", res_text).group(1) if "SCORE:" in res_text else "95"
+        tier_val = re.search(r"TIER:\s*(\w+)", res_text).group(1) if "TIER:" in res_text else "Verified"
 
-        # Metric Dashboard
+        # Metric Header
         m1, m2, m3 = st.columns(3)
-        with m1:
-            with st.popover(f"🎯 Confidence: {conf_val}%"):
-                st.write(f"### 🛡️ Audit Tier: {tier_val}")
-                st.write("**Scoring Matrix:**")
-                st.write("- **50%:** OCR/Literal Match")
-                st.write("- **30%:** Geometric Profile")
-                st.caption("Score indicates independent probability of a correct logistical match.")
-        
-        m2.metric("Logistics Status", tier_val, delta="Verified Path")
-        m3.metric("Lead Time", "24-48 Hours", delta="Priority A")
+        m1.metric("Primary Lock", f"{conf_val}%", delta=tier_val)
+        m2.metric("Alt Leads", "2 Matches", delta="Interchangeable")
+        m3.metric("Backlog", "10 Leads", delta="Low Conf")
 
         st.divider()
+
+        # Display Logic
+        st.markdown(f"### ✅ Primary Logistics Lock: {lock_name}")
         
-        # Regimented Report Display
-        with st.container(border=True):
-            st.markdown(f"### ✅ Logistics Lock: {lock_name}")
+        # Split and display sections
+        if "---ALTERNATIVES---" in res_text and "---BACKLOG---" in res_text:
+            main_body, alt_backlog = res_text.split("---ALTERNATIVES---")
+            alternatives, backlog = alt_backlog.split("---BACKLOG---")
             
-            # Splitting the response to show Top 3 vs Backlog
-            if "BACKLOG:" in res_text:
-                parts = res_text.split("BACKLOG:")
-                # Display everything between the Tier and the Backlog
-                main_report = parts[0].split(tier_val)[-1] if tier_val in parts[0] else parts[0]
-                st.markdown(main_report)
-                
-                with st.expander("🔍 View Technical Backlog (10 Possible Leads)"):
-                    st.write("These items match the broader visual taxonomy but require manual verification:")
-                    st.markdown(parts[1])
-            else:
-                # Fallback if AI didn't format the backlog correctly
-                display_text = res_text.split(tier_val)[-1] if tier_val in res_text else res_text
-                st.markdown(display_text)
+            st.markdown(main_body.split("TIER:")[1] if "TIER:" in main_body else main_body)
             
-            if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
-                st.balloons()
-                st.toast(f"Logistics data for {lock_name} transmitted to Section Chief.")
+            st.subheader("🔄 High-Confidence Alternatives")
+            st.info(alternatives)
+            
+            with st.expander("🔍 View Technical Backlog (10 Possible Leads)"):
+                st.markdown(backlog)
+        else:
+            st.markdown(res_text)
+
+        if st.button("TRANSMIT TO PROD SHOP", type="primary", use_container_width=True):
+            st.toast("Transmitted to Section Chief for Final Review.")
