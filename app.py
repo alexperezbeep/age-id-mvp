@@ -14,7 +14,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🛠️ AGE Context-Lock Identifier")
-st.caption("Standardized Visual-First Profiling for the 92nd MXS")
+st.caption("Universal Visual Taxonomy for the 92nd MXS")
 
 # 2. Step 1: Broad Functional Class
 st.subheader("Step 1: Select Equipment Category")
@@ -27,15 +27,12 @@ class_options = [
     "Towbar / Handling",
     "Engine / Component Class"
 ]
-
 selected_class = st.selectbox("Identify Category:", class_options)
 
 # 3. Step 2: Generalizable Visual Filters
 selected_profile = "[Not Sure]"
-
 if selected_class != "[Auto-Detect from Silhouette]":
     st.subheader("Step 2: Describe Physical Profile")
-    
     profiles = {
         "Heater / Environmental Control": ["Modern (Yellow / Enclosed)", "Legacy (Grey / Exposed Frame)", "Small (Portable Square)"],
         "Air Compressor": ["Low-Profile (Enclosed Box)", "Large Utility (Exposed Engine)", "High-Pressure (Dual Tank)"],
@@ -44,7 +41,6 @@ if selected_class != "[Auto-Detect from Silhouette]":
         "Towbar / Handling": ["Telescoping (Adjustable)", "Solid Bar (Fixed Length)", "Universal (Multi-Head)"],
         "Engine / Component Class": ["Small Diesel (Exposed/Fan)", "Large Industrial (Enclosed)", "Electrical Component"]
     }
-    
     current_options = profiles.get(selected_class, ["[Not Sure]"])
     selected_profile = st.radio("What does it look like?", ["[Not Sure]"] + current_options)
 
@@ -63,13 +59,13 @@ if uploaded_file:
         if not api_key:
             st.error("API Key not found.")
         else:
-            # Explicitly setting the client to avoid v1beta issues if possible
-            client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
+            # Reverting to standard initialization to fix 'tools' field mismatch
+            client = genai.Client(api_key=api_key)
             
             with st.spinner("Locking Context & Searching T.O.s..."):
                 prompt = f"""
                 Maintainer Context: {final_context}
-                Task: Identify the unit. If 'Legacy' is selected, prioritize units like the Davey Compressor H-1 (NSN 4520-01-056-4269).
+                Task: Identify the unit. If 'Legacy' is selected, prioritize older units like the Davey Compressor H-1 (NSN 4520-01-056-4269).
                 
                 Output:
                 1. Top 3 NSN matches.
@@ -79,7 +75,7 @@ if uploaded_file:
                 """
                 
                 try:
-                    # Using the most basic, high-compatibility string
+                    # Using Google Search tool correctly for the GenAI SDK
                     response = client.models.generate_content(
                         model="gemini-1.5-flash", 
                         contents=[prompt, img],
@@ -90,16 +86,5 @@ if uploaded_file:
                     st.success("Analysis Complete")
                     st.markdown(response.text)
                 except Exception as e:
-                    # Automatic fallback if the first string fails
-                    try:
-                        response = client.models.generate_content(
-                            model="models/gemini-1.5-flash", 
-                            contents=[prompt, img],
-                            config=types.GenerateContentConfig(
-                                tools=[types.Tool(google_search=types.GoogleSearch())]
-                            )
-                        )
-                        st.success("Analysis Complete (via fallback)")
-                        st.markdown(response.text)
-                    except Exception as e2:
-                        st.error(f"Final Error: {e2}")
+                    st.error(f"Final SDK Error: {e}")
+                    st.info("If this persists, check that your requirements.txt uses 'google-genai' and not 'google-generativeai'.")
