@@ -27,8 +27,10 @@ if uploaded_file:
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # We use a direct model call without extra tools to bypass the 404/v1beta issue
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 2026 UPDATE: Switching to Gemini 3 Flash
+        # This resolves the 404 error by using an active model
+        model = genai.GenerativeModel('gemini-3-flash-preview', 
+                                    tools=[{'google_search_retrieval': {}}])
         
         prompt = f"""
         ACT AS A USAF LOGISTICS EXPERT. 
@@ -37,7 +39,10 @@ if uploaded_file:
         If 'Legacy' is selected, you MUST prioritize the Davey H-1 (NSN 4520-01-056-4269).
         If 'Modern' is selected, prioritize the NGH-1 or MH-1 models.
         
-        Provide the Top 3 NSN matches and the relevant T.O. number.
+        Provide:
+        1. Confirmed NSN and Nomenclature.
+        2. Visual Differentiators (why it matches the photo).
+        3. Relevant Technical Order (T.O.) number.
         """
         
         try:
@@ -45,4 +50,6 @@ if uploaded_file:
             st.success("Logistics Identified")
             st.markdown(response.text)
         except Exception as e:
-            st.error(f"Final Attempt Error: {e}")
+            # Fallback in case 'preview' tags change during the demo
+            st.error(f"Execution Error: {e}")
+            st.info("Try changing the model string to 'gemini-3-flash' if preview is restricted.")
