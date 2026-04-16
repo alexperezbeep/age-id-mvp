@@ -8,7 +8,7 @@ st.set_page_config(page_title="AF AGE Context-Lock", page_icon="🛠️")
 st.title("🛠️ AGE Context-Lock Identifier")
 st.caption("Universal Visual Taxonomy & Workflow Logic | 92nd MXS")
 
-# 2. Universal Category Selection
+# 2. Universal Domain Selection
 st.subheader("Step 1: Technical Domain")
 domains = [
     "Ground Support Equipment (Full Unit)",
@@ -34,7 +34,7 @@ profiles = {
 current_options = profiles.get(selected_domain, ["Standard Configuration"])
 selected_profile = st.radio("Visual Profile:", current_options)
 
-# 5. Execution
+# 5. Execution Logic
 st.subheader("Step 3: Scan & Execute")
 uploaded_file = st.file_uploader("Upload component photo...", type=["jpg", "jpeg", "png"])
 
@@ -53,12 +53,13 @@ if uploaded_file:
         USER-OBSERVED CUES: {user_cues}
         
         TASK:
-        1. Identify the NSN. If a Part Number/Casting Number is in the 'User Cues', 
-           prioritize it to find the exact match.
+        1. Identify the TOP 3 most likely NSN matches. 
+           - If a Part Number or Casting Number is provided in 'User Cues', prioritize it for the lookup.
+           - Explain the difference between any generic results and specific matches found.
         2. Provide the Primary Technical Order (T.O.) number.
-        3. SAFETY: Identify 2-3 maintenance pitfalls for this specific profile.
-        4. COMMAND LOGIC: Remind the user that the Section Chief is the primary 
-           contact below the Production Superintendent.
+        3. SAFETY: Identify 2-3 specific maintenance pitfalls for this profile.
+        4. COMMAND LOGIC: Remind the user that for part validation, the Section Chief 
+           is the primary contact below the Production Superintendent.
         """
         
         try:
