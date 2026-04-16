@@ -18,10 +18,8 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Component Image", type=['png', 'jpg', 'jpeg'])
     
     st.divider()
-    # Preserved "Unknown" as the baseline safety net
     mode = st.radio("Asset Mode", ["Equipment", "Part", "Unknown / Not Sure"], index=2)
     
-    # Nudge categories to direct the AI's logic
     if mode == "Equipment":
         class_options = ["Power Gen", "HVAC", "Hydraulic Stands", "Towing Gear"]
     elif mode == "Part":
@@ -32,14 +30,12 @@ with st.sidebar:
     selected_class = st.selectbox("Select Class (Nudge AI)", class_options)
     feature = st.text_input("Distinguishing Feature", placeholder="e.g. 4-pin connector / PN 2335")
 
-    # --- THE REFRESH TRIGGER ---
-    # Purges logs if ANY input changes to prevent stale NSN display
+    # REFRESH TRIGGER
     current_fp = f"{getattr(uploaded_file, 'name', 'none')}-{mode}-{feature}-{selected_class}"
     if st.session_state.fingerprint != current_fp:
         st.session_state.resolved_results = [] 
         st.session_state.fingerprint = current_fp
 
-    # SUPPLY CART (LHS)
     st.divider()
     st.write(f"### 🛒 Supply Request Stage ({len(st.session_state.cart)})")
     for nsn, data in st.session_state.cart.items():
@@ -62,38 +58,35 @@ with col1:
             time.sleep(1.2)
             f_low = feature.lower()
             
-            # --- SIMULATED LOGIC BRANCHES ---
+            # Simulated Logic with Multiple Matches for Backlog Testing
             if "switch" in f_low or "2335" in f_low:
                 st.session_state.resolved_results = [
-                    {"nsn": "5930-01-235-1271", "pn": "2335-127-11", "name": "Switch, Pressure", "conf": 98, "status": "GREEN", "to": "1-1520-237-23", "action": "Ready to Order"},
-                    {"nsn": "5930-01-135-0096", "pn": "2335-4", "name": "Switch, Pressure", "conf": 72, "status": "YELLOW", "to": "1-1520-237-4", "action": "Verify PSI"},
-                    {"nsn": "5930-01-000-1111", "pn": "ALT-2335", "name": "Switch, Alt", "conf": 45, "status": "YELLOW", "to": "N/A", "action": "Check Fit"},
-                    {"nsn": "5930-01-999-9999", "pn": "LEGACY-X", "name": "Obsolete Switch", "conf": 12, "status": "RED", "to": "N/A", "action": "Halt Order"}
+                    {"nsn": "5930-01-235-1271", "pn": "2335-127-11", "name": "Switch, Press", "conf": 98, "status": "GREEN", "to": "1-1520-237-23", "action": "Ready to Order"},
+                    {"nsn": "5930-01-135-0096", "pn": "2335-4", "name": "Switch, Alt", "conf": 72, "status": "YELLOW", "to": "1-1520-237-4", "action": "Verify PSI"},
+                    {"nsn": "5930-01-000-1111", "pn": "ALT-2335", "name": "Switch, Sub", "conf": 65, "status": "YELLOW", "to": "N/A", "action": "Check Fit"},
+                    {"nsn": "5930-01-999-9999", "pn": "LEGACY-X", "name": "Obsolete", "conf": 45, "status": "RED", "to": "N/A", "action": "Halt Order"}
                 ]
-            elif "moog" in f_low or ("valve" in f_low and selected_class == "Hydraulic"):
+            elif "moog" in f_low or ("4-pin" in f_low and selected_class == "Hydraulic"):
                 st.session_state.resolved_results = [
-                    {"nsn": "4820-01-512-1001", "pn": "G761-3000P", "name": "Valve, Servo, Hydraulic", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order"},
-                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Low Flow", "conf": 65, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow Rate"},
-                    {"nsn": "4820-01-111-3333", "pn": "MOOG-GEN", "name": "General Valve", "conf": 40, "status": "YELLOW", "to": "N/A", "action": "Check Dimensions"},
-                    {"nsn": "4820-01-888-0000", "pn": "PNEU-V", "name": "Pneumatic Alt", "conf": 15, "status": "RED", "to": "N/A", "action": "Wrong System"}
+                    {"nsn": "4820-01-512-1001", "pn": "G761-3000P", "name": "Valve, Servo", "conf": 97, "status": "GREEN", "to": "TO 1-1-688", "action": "Ready to Order"},
+                    {"nsn": "4820-01-444-2222", "pn": "G761-200", "name": "Valve, Flow", "conf": 82, "status": "YELLOW", "to": "TO 1-1-688", "action": "Verify Flow"},
+                    {"nsn": "4820-01-111-3333", "pn": "MOOG-GEN", "name": "Gen Valve", "conf": 70, "status": "YELLOW", "to": "N/A", "action": "Check Dim"},
+                    {"nsn": "4820-01-888-0000", "pn": "PNEU-V", "name": "Pneumatic", "conf": 15, "status": "RED", "to": "N/A", "action": "Wrong System"}
                 ]
             else:
-                st.session_state.resolved_results = [
-                    {"nsn": "Multiple", "pn": "VARIOUS", "name": "System Match", "conf": 60, "status": "YELLOW", "to": "Verify in IPB", "action": "Verify Manual"}
-                ]
+                st.session_state.resolved_results = [{"nsn": "Multiple", "pn": "VARIOUS", "name": "Search", "conf": 60, "status": "YELLOW", "to": "IPB", "action": "Manual"}]
         st.rerun()
 
 with col2:
     st.header("2. NSN Resolution & Validation")
     if not st.session_state.resolved_results:
-        st.info("Awaiting input. Select Mode/Class and Stage for Request.")
+        st.info("Input change detected. Stage for Request to see fresh logs.")
     else:
-        # Sort by confidence descending
+        # SORT AND SPLIT LOGIC
         res = sorted(st.session_state.resolved_results, key=lambda x: x['conf'], reverse=True)
         top_3 = res[:3]
         backlog = res[3:]
 
-        # TOP MATCHES
         st.subheader("Top Matches")
         for item in top_3:
             b_color = {"GREEN": "green", "YELLOW": "orange", "RED": "red"}[item['status']]
